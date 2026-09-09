@@ -30,12 +30,25 @@ app = FastAPI(title="eGain Sales Prospects (ESP)", version="1.0.0", root_path=RO
 PUBLIC_PREFIXES = ("/static", "/favicon.ico", "/healthz", "/api/auth")
 
 
+def _route_path(request: Request) -> str:
+    """Request path with the mount prefix removed.
+
+    The prefix can arrive two ways: from ESP_ROOT_PATH behind a reverse proxy, or
+    from the server itself (Passenger sets SCRIPT_NAME, which reaches us as the
+    ASGI root_path). Reading only the environment variable makes every path look
+    unmatched under Passenger - including the login endpoint - so check both.
+    """
+    root = request.scope.get("root_path", "") or ROOT_PATH
+    path = request.url.path
+    if root and path.startswith(root):
+        path = path[len(root):] or "/"
+    return path or "/"
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     if auth.enabled():
-        path = request.url.path
-        if ROOT_PATH and path.startswith(ROOT_PATH):
-            path = path[len(ROOT_PATH):] or "/"
+        path = _route_path(request)
         if path != "/" and not path.startswith(PUBLIC_PREFIXES):
             if not auth.valid_token(request.cookies.get(auth.COOKIE_NAME)):
                 return JSONResponse({"error": "Sign in to continue.", "auth_required": True}, status_code=401)
