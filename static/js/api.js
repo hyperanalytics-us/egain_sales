@@ -1,11 +1,21 @@
 /* Thin fetch wrapper.  Every call is scoped to the active dataset. */
+/* Base path the app is mounted at ("/" or "/esp/"), injected by the server. */
+const BASE = (window.ESP_BASE || '/').replace(/\/+$/, '');
+const url = (p) => BASE + p;
+
 const API = {
   ds: null,
+  base: BASE,
+  onAuthRequired: null,
 
   async req(path, opts = {}) {
-    const res = await fetch(path, opts);
+    const res = await fetch(url(path), { credentials: 'same-origin', ...opts });
     const ct = res.headers.get('content-type') || '';
     const body = ct.includes('application/json') ? await res.json() : await res.text();
+    if (res.status === 401 && body && body.auth_required) {
+      if (this.onAuthRequired) this.onAuthRequired();
+      throw new Error(body.error || 'Sign in to continue.');
+    }
     if (!res.ok) throw new Error((body && body.error) || res.statusText || 'Request failed');
     return body;
   },
@@ -39,6 +49,10 @@ const API = {
   ask(question, sid)    { return this.post(`/api/${this.ds}/ask`, { question, session_id: sid }); },
   exportUrl(p) {
     const qs = new URLSearchParams(Object.entries(p || {}).filter(([, v]) => v !== null && v !== undefined && v !== '' && v !== false));
-    return `/api/${this.ds}/export/prospects.csv?${qs}`;
+    return url(`/api/${this.ds}/export/prospects.csv?${qs}`);
   },
+
+  authStatus()      { return this.get('/api/auth/status'); },
+  login(password)   { return this.post('/api/auth/login', { password }); },
+  logout()          { return this.post('/api/auth/logout'); },
 };

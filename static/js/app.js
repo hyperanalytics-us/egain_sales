@@ -206,8 +206,59 @@ const App = (() => {
     }).catch((e) => { body.innerHTML = ''; body.appendChild(Pages.errorBox(e)); });
   }
 
+  /* ------------------------------------------------------------- login --- */
+  let loginOpen = false;
+
+  function showLogin(message) {
+    if (loginOpen) return;
+    loginOpen = true;
+    const root = document.getElementById('overlay-root');
+    const el = h(`<div class="overlay" data-login>
+      <div class="modal" style="width:min(400px,100%)">
+        <h2>Sign in to ESP</h2>
+        <div class="body">
+          <p class="muted small" style="margin-top:0">This workspace holds prospect data. Enter the shared password to continue.</p>
+          <input type="password" data-pw placeholder="Password" style="width:100%" autocomplete="current-password">
+          <div data-msg class="note err small" style="margin:12px 0 0;display:none"></div>
+        </div>
+        <div class="foot"><button class="btn primary" data-go>Sign in</button></div>
+      </div></div>`);
+    root.appendChild(el);
+    const pw = el.querySelector('[data-pw]');
+    const msg = el.querySelector('[data-msg]');
+    if (message) { msg.textContent = message; msg.style.display = ''; }
+    const submit = async () => {
+      const btn = el.querySelector('[data-go]');
+      btn.disabled = true;
+      try {
+        await API.login(pw.value);
+        el.remove(); loginOpen = false;
+        await loadDatasets(); render();
+      } catch (e) {
+        msg.textContent = e.message || 'Incorrect password.';
+        msg.style.display = '';
+        pw.select();
+      } finally { btn.disabled = false; }
+    };
+    el.querySelector('[data-go]').onclick = submit;
+    pw.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+    pw.focus();
+  }
+
   async function boot() {
     buildNav();
+    API.onAuthRequired = () => showLogin('Your session expired. Sign in again.');
+    let authed = true;
+    try {
+      const st = await API.authStatus();
+      authed = st.signed_in;
+      if (st.auth_required) {
+        const out = h('<button class="btn sm" style="margin-top:8px">Sign out</button>');
+        out.onclick = async () => { await API.logout(); location.reload(); };
+        document.querySelector('.side-foot').appendChild(out);
+      }
+      if (!authed) { showLogin(); return; }
+    } catch (e) { /* auth endpoint unreachable - fall through to the normal error path */ }
     document.getElementById('btn-upload').onclick = uploadDialog;
     document.getElementById('btn-manage').onclick = manageDialog;
     document.getElementById('ds-select').onchange = async (e) => {

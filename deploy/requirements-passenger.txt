@@ -1,0 +1,6 @@
+# Dependencies for cPanel "Setup Python App" (Passenger/WSGI).
+# Passenger speaks WSGI, so a2wsgi is added on top of the normal requirements.
+fastapi==0.115.6
+python-multipart==0.0.20
+anthropic>=0.69.0
+a2wsgi==1.10.7

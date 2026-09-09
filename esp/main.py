@@ -1,6 +1,7 @@
 """ESP - eGain Sales Prospects.  FastAPI backend + static single-page UI."""
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import os
@@ -15,10 +16,30 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request,
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import askai, db, enrich, ingest, reports
+from . import askai, auth, db, enrich, ingest, reports
 from .config import MAX_UPLOAD_BYTES, MAX_UPLOAD_MB, STATIC_DIR, UPLOAD_DIR
 
-app = FastAPI(title="eGain Sales Prospects (ESP)", version="1.0.0")
+# ESP is commonly mounted under a sub-path (e.g. https://example.com/esp).
+# Passenger/WSGI supplies SCRIPT_NAME automatically; behind a plain reverse proxy
+# set ESP_ROOT_PATH so generated URLs and docs carry the prefix.
+ROOT_PATH = os.environ.get("ESP_ROOT_PATH", "").rstrip("/")
+
+app = FastAPI(title="eGain Sales Prospects (ESP)", version="1.0.0", root_path=ROOT_PATH)
+
+# Paths reachable without a session: the shell, its assets, and the login itself.
+PUBLIC_PREFIXES = ("/static", "/favicon.ico", "/healthz", "/api/auth")
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    if auth.enabled():
+        path = request.url.path
+        if ROOT_PATH and path.startswith(ROOT_PATH):
+            path = path[len(ROOT_PATH):] or "/"
+        if path != "/" and not path.startswith(PUBLIC_PREFIXES):
+            if not auth.valid_token(request.cookies.get(auth.COOKIE_NAME)):
+                return JSONResponse({"error": "Sign in to continue.", "auth_required": True}, status_code=401)
+    return await call_next(request)
 
 ALLOWED_EXT = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".log"}
 _jobs: Dict[str, Dict[str, Any]] = {}
@@ -370,6 +391,41 @@ def ask_status():
     return {"enabled": askai.available(), "suggestions": askai.SUGGESTIONS}
 
 
+# --------------------------------------------------------------------- auth --
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    return {
+        "auth_required": auth.enabled(),
+        "signed_in": not auth.enabled() or auth.valid_token(request.cookies.get(auth.COOKIE_NAME)),
+    }
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request):
+    if not auth.enabled():
+        return {"ok": True, "auth_required": False}
+    body = await request.json()
+    if not auth.check_password(body.get("password") or ""):
+        # Slow down credential guessing without holding a worker for long.
+        await asyncio.sleep(1.0)
+        raise HTTPException(401, "Incorrect password.")
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        auth.COOKIE_NAME, auth.issue_token(),
+        max_age=auth.SESSION_TTL, httponly=True, samesite="lax",
+        secure=request.url.scheme == "https",
+        path=(ROOT_PATH or "/"),
+    )
+    return response
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(auth.COOKIE_NAME, path=(ROOT_PATH or "/"))
+    return response
+
+
 # -------------------------------------------------------------------- shell --
 @app.exception_handler(HTTPException)
 async def http_error(_: Request, exc: HTTPException):
@@ -377,14 +433,18 @@ async def http_error(_: Request, exc: HTTPException):
 
 
 @app.get("/")
-def index():
-    """Serve the shell with asset URLs stamped by build time.
+def index(request: Request):
+    """Serve the shell, stamped with the mount point and a cache-busting version.
 
-    The app ships as plain files with no bundler, so without a cache buster a
-    browser happily keeps running yesterday's JavaScript after an update.
+    ESP may be mounted at the domain root or under a sub-path such as /esp, so the
+    base is taken from the request rather than hard-coded; assets and API calls are
+    resolved against it.  The version query stops browsers running stale JavaScript
+    after an update, since the app ships as plain files with no bundler.
     """
+    base = (ROOT_PATH or request.scope.get("root_path", "")).rstrip("/") + "/"
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(html.replace("__ESP_V__", _asset_version()))
+    html = html.replace("__ESP_BASE__", base).replace("__ESP_V__", _asset_version())
+    return HTMLResponse(html)
 
 
 def _asset_version() -> str:
@@ -411,7 +471,7 @@ def favicon():
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "datasets": len(db.list_datasets()["datasets"]), "ai_enabled": askai.available()}
+    return {"ok": True, "datasets": len(db.list_datasets()["datasets"]), "ai_enabled": askai.available(), "auth_required": auth.enabled()}
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
