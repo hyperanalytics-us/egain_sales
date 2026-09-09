@@ -1,8 +1,9 @@
 __pycache__/
 *.pyc
 .env
-data/datasets/
-data/uploads/
+# Runtime state: uploads, dataset databases, job files, chat sessions and
+# data/.session_secret, which signs the login cookie. Never commit any of it.
+data/
 .venv/
 venv/
 .DS_Store
