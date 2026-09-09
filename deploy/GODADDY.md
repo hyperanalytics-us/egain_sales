@@ -171,6 +171,23 @@ Should return `{"ok":true,...,"auth_required":true}`.
 
 ---
 
+## Environment variables: use .env, not the cPanel field
+
+cPanel writes environment variables into a `<IfModule Litespeed>` block in the
+Passenger `.htaccess`. **This account runs Apache, not LiteSpeed**, so anything
+entered in that cPanel field is ignored.
+
+Put them in `~/esp/.env` instead — ESP reads it at startup, and it sits outside
+the web root so it is never served:
+
+```bash
+ESP_PASSWORD=<a long shared password>
+ESP_SECRET=<random string, keeps sessions alive across restarts>
+ANTHROPIC_API_KEY=<your key, enables ASK AI>
+```
+
+`chmod 600 ~/esp/.env`, then `touch ~/esp/tmp/restart.txt` to apply.
+
 ## Cloudflare sits in front of this domain
 
 `hyperanalyticslabs.com` resolves to Cloudflare, which proxies to GoDaddy. Two
@@ -186,12 +203,45 @@ consequences ESP already handles:
 If you later see a 524 anyway, it is something new holding a request open — not
 ingestion or ASK AI.
 
+## The one non-obvious failure: inherited rewrites
+
+Symptom: `https://hyperanalyticslabs.com/esp/` loads the UI, but **every route
+beneath it returns 500** — `/esp/healthz`, `/esp/api/...`, even `/esp/static/...`.
+
+Cause: a catch-all rewrite in a parent directory. On this account
+`~/public_html/.htaccess` is a WordPress config containing
+
+```apache
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.* [L]
+```
+
+Any path that is not an existing file or directory is rewritten before Passenger
+sees it. `/esp/` survives because it *is* a real directory; nothing under it is.
+
+Fix (applied automatically by `deploy/deploy.sh`) — append to the Passenger
+`.htaccess` that cPanel created, below its managed blocks:
+
+```apache
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^ - [L]
+</IfModule>
+```
+
+Giving the directory its own ruleset stops the inherited rules from applying.
+
+**Worth knowing separately:** that same rewrite means *any* missing URL on the
+site returns **500 instead of 404**. Try `hyperanalyticslabs.com/does-not-exist`.
+That is a pre-existing site issue, unrelated to ESP, and worth fixing on its own.
+
 ## Limits to watch on GoDaddy shared hosting
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | Upload dies partway with no error | Account memory cap (Deluxe: 1 GB shared with everything else on the account) | Check cPanel → Resource Usage right after it fails. Lower `ESP_SQLITE_CACHE_MB` to 4 and retry |
-| Ingest takes several minutes | Deluxe I/O throttle of 10 MB/s, ~300 MB written per weblog | Expected. Leave the tab open; the progress bar is live |
+| Ingest takes a minute or two | Deluxe I/O throttle of 10 MB/s | Expected. Measured on this account: **81 s and 166 MB peak** for the 530k-row reference log |
 | "Request Entity Too Large" | Apache `LimitRequestBody` | Ask GoDaddy support to raise it for the account, or split the log |
 | ASK AI errors, everything else fine | Outbound HTTPS blocked | Ask support to allow `api.anthropic.com`. Only ASK AI is affected |
 | First request after idle is slow | Passenger stopped an idle process | Normal. It respawns in a few seconds |

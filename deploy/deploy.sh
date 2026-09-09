@@ -104,6 +104,34 @@ if [ "$IN_DOCROOT" = "1" ]; then
   echo "  appended deny rules for data/, esp/, scripts/, deploy/ and .env to $DEST/.htaccess"
 fi
 
+# ------------------------------------------- passenger .htaccess guard -----
+# cPanel writes a Passenger .htaccess into the document root. If a parent
+# directory carries a catch-all rewrite (a WordPress .htaccess one level up is
+# the usual culprit), every ESP path that is not an existing file or directory
+# gets rewritten before Passenger sees it - the app answers on /esp/ and returns
+# 500 for every route beneath it. Giving this directory its own ruleset stops
+# the inherited rules applying here.
+say "Checking the Passenger .htaccess"
+HTACCESS=$(ssh "$TARGET" "grep -rl 'PassengerAppRoot \"$DEST\"' \$HOME/public_html 2>/dev/null | head -1" || true)
+if [ -n "$HTACCESS" ]; then
+  echo "  $HTACCESS"
+  if ssh "$TARGET" "grep -q 'ESP: neutralise inherited rewrites' '$HTACCESS'"; then
+    echo "  rewrite guard already present"
+  else
+    ssh "$TARGET" "cp '$HTACCESS' '$HTACCESS.bak-esp' && cat >> '$HTACCESS' <<'EOF'
+
+# ESP: neutralise inherited rewrites so Passenger sees every /esp/* request.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^ - [L]
+</IfModule>
+EOF"
+    echo "  added rewrite guard (original backed up alongside it)"
+  fi
+else
+  warn "Could not find the Passenger .htaccess - create the app in cPanel first."
+fi
+
 # -------------------------------------------------------------- restart ----
 say "Restarting Passenger"
 ssh "$TARGET" "mkdir -p '$DEST/tmp' && touch '$DEST/tmp/restart.txt'"
