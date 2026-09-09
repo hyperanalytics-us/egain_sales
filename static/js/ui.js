@@ -12,6 +12,11 @@ const UI = (() => {
 
   const titleCase = (s) => String(s || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
+  /* Charts must not be scheduled with requestAnimationFrame: a backgrounded tab
+     suspends rAF indefinitely, so a chart queued while the user is on another tab
+     would never be drawn.  setTimeout keeps running when hidden. */
+  const defer = (fn) => setTimeout(fn, 0);
+
   function h(html) { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
 
   /* Chart.js palette that stays legible in both themes. */
@@ -30,6 +35,11 @@ const UI = (() => {
   }
 
   function drawChart(canvas, config) {
+    // Re-rendering a page throws away its canvases; their Chart instances would
+    // otherwise stay alive (with their resize observers) forever.
+    for (const [cv, chart] of chartRegistry) {
+      if (!cv.isConnected) { chart.destroy(); chartRegistry.delete(cv); }
+    }
     const prev = chartRegistry.get(canvas);
     if (prev) prev.destroy();
     const c = new Chart(canvas.getContext('2d'), config);
@@ -207,7 +217,7 @@ const UI = (() => {
       panes.forEach((p) => p.style.display = p.dataset.pane === b.dataset.v ? '' : 'none');
     });
 
-    requestAnimationFrame(() => {
+    defer(() => {
       if (!slices || !slices.length) {
         canvas.parentElement.innerHTML = '<div class="empty">Nothing to chart yet.</div>';
         return;
@@ -280,5 +290,5 @@ const UI = (() => {
     return out;
   }
 
-  return { esc, num, slug, titleCase, h, pie, bar, line, table, chartTableCard, modal, toast, markdown, PALETTE };
+  return { esc, num, slug, titleCase, h, defer, pie, bar, line, table, chartTableCard, modal, toast, markdown, PALETTE };
 })();

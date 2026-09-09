@@ -256,7 +256,7 @@ const Pages = (() => {
     const act = h(`<div class="card"><h3>Daily request volume</h3><div class="body"><div class="chart-wrap"><canvas></canvas></div></div></div>`);
     grid.appendChild(act);
     view.appendChild(grid);
-    requestAnimationFrame(() => UI.line(act.querySelector('canvas'),
+    UI.defer(() => UI.line(act.querySelector('canvas'),
       d.activity.map((a) => a.label), [{ label: 'Requests', data: d.activity.map((a) => a.value) }]));
   }
 
@@ -296,7 +296,7 @@ const Pages = (() => {
       const barCard = h(`<div class="card"><h3>Prospects by ${esc(kind)}</h3><div class="body"><div class="chart-wrap tall"><canvas></canvas></div></div></div>`);
       grid.appendChild(barCard);
       view.appendChild(grid);
-      requestAnimationFrame(() => {
+      UI.defer(() => {
         const top = data.rows.slice(0, 12);
         UI.bar(barCard.querySelector('canvas'), top.map((r) => r.key),
           [{ label: 'Prospect IPs', data: top.map((r) => r.prospects) }], { horizontal: true });
@@ -334,7 +334,7 @@ const Pages = (() => {
     const barCard = h('<div class="card"><h3>Top referrers by request volume</h3><div class="body"><div class="chart-wrap tall"><canvas></canvas></div></div></div>');
     grid.appendChild(barCard);
     view.appendChild(grid);
-    requestAnimationFrame(() => {
+    UI.defer(() => {
       const top = s.rows.slice(0, 15);
       UI.bar(barCard.querySelector('canvas'), top.map((r) => r.ref_host),
         [{ label: 'Requests', data: top.map((r) => r.requests) }], { horizontal: true });
@@ -380,7 +380,7 @@ const Pages = (() => {
     const scoreHist = h('<div class="card"><h3>Intent score distribution</h3><div class="body"><div class="chart-wrap"><canvas></canvas></div></div></div>');
     grid.append(hist, scoreHist);
     view.appendChild(grid);
-    requestAnimationFrame(() => {
+    UI.defer(() => {
       UI.bar(hist.querySelector('canvas'), a.request_buckets.map((b) => b.bucket + ' request(s)'),
         [{ label: 'IPs', data: a.request_buckets.map((b) => b.ips) }]);
       UI.bar(scoreHist.querySelector('canvas'), a.score_histogram.map((b) => `${b.band}–${b.band + 9}`),
@@ -481,7 +481,7 @@ const Pages = (() => {
         const card = h(`<div style="margin-top:12px"><div class="small muted" style="margin-bottom:5px"><b>${esc(c.title)}</b></div>
           <div class="chart-wrap"><canvas></canvas></div></div>`);
         b.appendChild(card);
-        requestAnimationFrame(() => {
+        UI.defer(() => {
           const cv = card.querySelector('canvas');
           const series = (c.series || []).map((s) => ({ label: s.label, data: s.data }));
           if (c.type === 'pie' || c.type === 'doughnut') {

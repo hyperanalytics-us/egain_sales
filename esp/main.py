@@ -12,7 +12,7 @@ import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import askai, db, enrich, ingest, reports
@@ -378,7 +378,21 @@ async def http_error(_: Request, exc: HTTPException):
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    """Serve the shell with asset URLs stamped by build time.
+
+    The app ships as plain files with no bundler, so without a cache buster a
+    browser happily keeps running yesterday's JavaScript after an update.
+    """
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(html.replace("__ESP_V__", _asset_version()))
+
+
+def _asset_version() -> str:
+    newest = 0.0
+    for path in STATIC_DIR.rglob("*"):
+        if path.is_file():
+            newest = max(newest, path.stat().st_mtime)
+    return str(int(newest))
 
 
 FAVICON = (
