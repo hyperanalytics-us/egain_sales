@@ -68,9 +68,14 @@ def parse_query(query: str) -> Dict[str, str]:
             k = k[4:]
         if k in ("utm_campaign", "utm_source", "utm_medium", "uid", "utm_term", "utm_content", "cid", "campaign"):
             try:
-                out[k] = unquote_plus(v)[:120]
+                val = unquote_plus(v)
             except Exception:
-                out[k] = v[:120]
+                val = v
+            if k == "uid":
+                # Some links append a path to the uid, e.g.
+                # uid=<guid>/cdn-cgi/scripts/.../email-decode.min.js - keep the id.
+                val = val.split("/", 1)[0].strip()
+            out[k] = val[:120]
     return out
 
 

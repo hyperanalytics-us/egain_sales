@@ -9,7 +9,7 @@ from .config import TOP_PIPELINE_LIMIT, TOP_SOURCES_LIMIT
 from .scoring import TIER_ACTIONS, TIER_GUIDE, TIER_ORDER, WEIGHTS_REFERENCE
 
 PROSPECT_COLUMNS = [
-    "rank", "tier", "score", "ip", "company", "domain", "source", "uid", "campaign",
+    "rank", "tier", "score", "ip", "company", "domain", "contact", "source", "uid", "campaign",
     "first_visit", "last_visit", "active_days", "sessions", "page_views", "unique_pages",
     "contact_views", "demo_views", "product_views", "products", "industries",
     "crawler_risk", "risk_reason", "top_referrer", "top_intent_pages", "why",
@@ -32,6 +32,7 @@ def _prospect_row(r: sqlite3.Row, rank: int) -> Dict[str, Any]:
         "ip": r["ip"],
         "company": r["company"] if "company" in r.keys() and r["company"] else "",
         "domain": r["domain"] if "domain" in r.keys() and r["domain"] else "",
+        "contact": (r["contact"] if "contact" in r.keys() and r["contact"] else ""),
         "source": r["source"],
         "uid": r["uid"] or "",
         "campaign": r["campaigns"] or "",
@@ -57,8 +58,11 @@ def _prospect_row(r: sqlite3.Row, rank: int) -> Dict[str, Any]:
 
 
 _BASE_SELECT = """
-SELECT s.*, m.company AS company, m.domain AS domain
-FROM ip_stats s LEFT JOIN ip_map m ON m.ip = s.ip
+SELECT s.*, m.company AS company, m.domain AS domain,
+       u.contact AS contact, u.company AS contact_company
+FROM ip_stats s
+LEFT JOIN ip_map m  ON m.ip  = s.ip
+LEFT JOIN uid_map u ON u.uid = s.uid
 """
 
 
@@ -106,13 +110,15 @@ def prospects(
         params.append(campaign)
     if search:
         where.append("(s.ip LIKE ? OR IFNULL(m.company,'') LIKE ? OR IFNULL(m.domain,'') LIKE ? "
-                     "OR IFNULL(s.products,'') LIKE ? OR IFNULL(s.industries,'') LIKE ? OR IFNULL(s.uid,'') LIKE ?)")
+                     "OR IFNULL(s.products,'') LIKE ? OR IFNULL(s.industries,'') LIKE ? "
+                     "OR IFNULL(s.uid,'') LIKE ? OR IFNULL(u.contact,'') LIKE ?)")
         like = f"%{search}%"
-        params.extend([like] * 6)
+        params.extend([like] * 7)
 
     clause = " AND ".join(where)
-    total = conn.execute(f"SELECT COUNT(*) AS n FROM ip_stats s LEFT JOIN ip_map m ON m.ip = s.ip WHERE {clause}",
-                         params).fetchone()["n"]
+    total = conn.execute(
+        "SELECT COUNT(*) AS n FROM ip_stats s LEFT JOIN ip_map m ON m.ip = s.ip "
+        f"LEFT JOIN uid_map u ON u.uid = s.uid WHERE {clause}", params).fetchone()["n"]
     rows = conn.execute(
         f"{_BASE_SELECT} WHERE {clause} ORDER BY s.score DESC, s.demo_views DESC, s.contact_views DESC, "
         f"s.page_views DESC LIMIT ? OFFSET ?",
@@ -178,15 +184,134 @@ def product_report(conn: sqlite3.Connection) -> Dict[str, Any]:
 def campaign_report(conn: sqlite3.Connection) -> Dict[str, Any]:
     d = _dimension(conn, "ip_campaign", "campaign", "Campaign")
     extra = {r["campaign"]: dict(r) for r in conn.execute("SELECT * FROM campaigns")}
+    identified = {
+        r["campaign"]: r["n"] for r in conn.execute(
+            "SELECT r.campaign AS campaign, COUNT(DISTINCT r.uid) AS n FROM requests r "
+            "JOIN uid_map u ON u.uid = r.uid WHERE IFNULL(r.campaign,'') <> '' GROUP BY r.campaign")
+    }
     for row in d["rows"]:
         e = extra.get(row["key"], {})
+        row["identified"] = identified.get(row["key"], 0)
         row["uids"] = e.get("uids", 0)
         row["requests"] = e.get("requests", 0)
         row["utm_source"] = e.get("utm_source", "")
         row["utm_medium"] = e.get("utm_medium", "")
-    d["columns"] = ["key", "prospects", "named_accounts", "uids", "a_immediate", "a_high", "b_warm",
-                    "c_nurture", "demo_views", "contact_views", "requests", "utm_source", "utm_medium", "avg_score"]
+    d["columns"] = ["key", "prospects", "identified", "uids", "named_accounts", "a_immediate", "a_high",
+                    "b_warm", "c_nurture", "demo_views", "contact_views", "requests", "avg_score"]
     return d
+
+
+CONTACT_COLUMNS = ["rank", "contact", "company", "email", "title", "campaign", "uid", "best_tier",
+                   "best_score", "ips", "requests", "contact_views", "demo_views", "product_views",
+                   "first_seen", "last_seen", "reach"]
+
+
+def campaign_contacts(
+    conn: sqlite3.Connection,
+    campaign: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+    identified_only: bool = True,
+    converted_only: bool = False,
+    search: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Who a campaign actually reached, by CRM UID.
+
+    A uid is the recipient of the email, so this answers "whom are we targeting"
+    in human terms.  One uid can appear from many IP addresses because corporate
+    mail scanners follow links on the recipient's behalf, so the number of source
+    IPs is reported rather than hidden - a uid seen from a dozen addresses is
+    usually automation, not a keen buyer.
+    """
+    where = ["IFNULL(r.uid,'') <> ''"]
+    params: List[Any] = []
+    if campaign:
+        where.append("r.campaign = ?")
+        params.append(campaign)
+    if identified_only:
+        where.append("u.uid IS NOT NULL")
+    if converted_only:
+        where.append("r.uid IN (SELECT uid FROM requests WHERE category IN ('contact','demo') AND IFNULL(uid,'') <> '')")
+    if search:
+        where.append("(IFNULL(u.contact,'') LIKE ? OR IFNULL(u.company,'') LIKE ? "
+                     "OR IFNULL(u.email,'') LIKE ? OR r.uid LIKE ?)")
+        params.extend([f"%{search}%"] * 4)
+    clause = " AND ".join(where)
+
+    base = f"""
+        FROM requests r
+        LEFT JOIN uid_map u ON u.uid = r.uid
+        WHERE {clause}
+        GROUP BY r.uid, r.campaign
+    """
+    total = conn.execute(f"SELECT COUNT(*) AS n FROM (SELECT r.uid {base})", params).fetchone()["n"]
+
+    rows = conn.execute(
+        f"""
+        SELECT r.uid AS uid, IFNULL(r.campaign,'') AS campaign,
+               IFNULL(u.contact,'') AS contact, IFNULL(u.company,'') AS company,
+               IFNULL(u.email,'') AS email, IFNULL(u.title,'') AS title,
+               COUNT(*) AS requests, COUNT(DISTINCT r.ip) AS ips,
+               MIN(r.ts) AS first_ts, MAX(r.ts) AS last_ts,
+               SUM(r.category = 'contact') AS contact_views,
+               SUM(r.category = 'demo') AS demo_views,
+               SUM(IFNULL(r.product,'') <> '') AS product_views
+        {base}
+        ORDER BY (SUM(r.category='demo') * 3 + SUM(r.category='contact') * 2) DESC,
+                 COUNT(*) DESC
+        LIMIT ? OFFSET ?
+        """,
+        params + [limit, offset],
+    ).fetchall()
+
+    # Best tier/score across the addresses this person's clicks came from.
+    out: List[Dict[str, Any]] = []
+    for i, r in enumerate(rows):
+        best = conn.execute(
+            "SELECT s.tier, s.score FROM ip_stats s WHERE s.ip IN "
+            "(SELECT ip FROM requests WHERE uid = ?) AND s.eligible = 1 "
+            "ORDER BY s.score DESC LIMIT 1", (r["uid"],)
+        ).fetchone()
+        ips = r["ips"]
+        reach = ("Likely mail scanner" if ips >= 8 else
+                 "Shared / multiple networks" if ips >= 3 else "Single network")
+        out.append({
+            "rank": offset + i + 1,
+            "contact": r["contact"] or "(not in uploaded CRM export)",
+            "company": r["company"],
+            "email": r["email"],
+            "title": r["title"],
+            "campaign": r["campaign"],
+            "uid": r["uid"],
+            "best_tier": best["tier"] if best else "",
+            "best_score": best["score"] if best else 0,
+            "ips": ips,
+            "requests": r["requests"],
+            "contact_views": r["contact_views"],
+            "demo_views": r["demo_views"],
+            "product_views": r["product_views"],
+            "first_seen": _iso(r["first_ts"]),
+            "last_seen": _iso(r["last_ts"]),
+            "reach": reach,
+        })
+
+    stats = conn.execute(
+        "SELECT COUNT(*) AS mapped, "
+        "(SELECT COUNT(DISTINCT uid) FROM requests WHERE IFNULL(uid,'') <> '') AS total_uids, "
+        "(SELECT COUNT(DISTINCT r.uid) FROM requests r JOIN uid_map u2 ON u2.uid = r.uid) AS matched_uids, "
+        "(SELECT COUNT(DISTINCT r.uid) FROM requests r JOIN uid_map u3 ON u3.uid = r.uid "
+        " WHERE r.category IN ('contact','demo')) AS converted "
+        "FROM uid_map"
+    ).fetchone()
+
+    return {
+        "columns": CONTACT_COLUMNS,
+        "rows": out,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "mapping": {k: stats[k] for k in ("mapped", "total_uids", "matched_uids", "converted")},
+    }
 
 
 def sources_report(conn: sqlite3.Connection, limit: int = TOP_SOURCES_LIMIT) -> Dict[str, Any]:

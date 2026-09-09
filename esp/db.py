@@ -128,6 +128,18 @@ CREATE TABLE IF NOT EXISTS campaigns (
     utm_medium    TEXT
 );
 
+-- Optional sales-supplied CRM UID -> contact mapping. A uid comes from the
+-- uid= parameter on marketing-email links, so it identifies the person the
+-- campaign was sent to - stronger identity resolution than reverse-IP lookup.
+CREATE TABLE IF NOT EXISTS uid_map (
+    uid     TEXT PRIMARY KEY,
+    contact TEXT,
+    email   TEXT,
+    company TEXT,
+    title   TEXT,
+    extra   TEXT
+);
+
 -- Optional sales-supplied IP -> company mapping.
 CREATE TABLE IF NOT EXISTS ip_map (
     ip      TEXT PRIMARY KEY,
@@ -150,6 +162,7 @@ CREATE INDEX IF NOT EXISTS idx_req_campaign ON requests(campaign);
 CREATE INDEX IF NOT EXISTS idx_req_ts       ON requests(ts);
 CREATE INDEX IF NOT EXISTS idx_req_product  ON requests(product);
 CREATE INDEX IF NOT EXISTS idx_req_industry ON requests(industry);
+CREATE INDEX IF NOT EXISTS idx_req_uid      ON requests(uid);
 CREATE INDEX IF NOT EXISTS idx_ipstats_score ON ip_stats(score DESC);
 CREATE INDEX IF NOT EXISTS idx_ipstats_tier  ON ip_stats(tier);
 CREATE INDEX IF NOT EXISTS idx_ipprod       ON ip_product(product);
@@ -163,11 +176,18 @@ def dataset_path(dataset_id: str) -> str:
 
 
 def connect(dataset_id: str, readonly: bool = False) -> sqlite3.Connection:
+    """Open a dataset.
+
+    check_same_thread=False because FastAPI runs a sync dependency and the sync
+    endpoint it feeds on different threadpool threads: the connection is opened
+    in one and used in the other. Each request still gets its own connection and
+    closes it, so no connection is ever used concurrently.
+    """
     path = dataset_path(dataset_id)
     if readonly:
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30, check_same_thread=False)
     else:
-        conn = sqlite3.connect(path, timeout=60)
+        conn = sqlite3.connect(path, timeout=60, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -180,6 +200,44 @@ def init_db(dataset_id: str) -> sqlite3.Connection:
 
 def create_indexes(conn: sqlite3.Connection) -> None:
     conn.executescript(INDEXES)
+
+
+MIGRATIONS = """
+CREATE TABLE IF NOT EXISTS uid_map (
+    uid     TEXT PRIMARY KEY,
+    contact TEXT,
+    email   TEXT,
+    company TEXT,
+    title   TEXT,
+    extra   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_req_uid ON requests(uid);
+
+-- Older ingests captured a trailing path in the uid value, e.g.
+-- uid=<guid>/cdn-cgi/scripts/.../email-decode.min.js, which split one person
+-- into several ids and broke CRM matching. Normalise in place rather than
+-- forcing a costly re-ingest.
+UPDATE requests SET uid = substr(uid, 1, instr(uid, '/') - 1) WHERE instr(uid, '/') > 0;
+UPDATE ip_stats SET uid = substr(uid, 1, instr(uid, '/') - 1) WHERE instr(uid, '/') > 0;
+UPDATE campaigns SET uids = (
+    SELECT COUNT(DISTINCT r.uid) FROM requests r
+    WHERE r.campaign = campaigns.campaign AND IFNULL(r.uid, '') <> ''
+);
+"""
+
+
+def migrate(dataset_id: str) -> None:
+    """Bring an already-ingested dataset up to the current schema.
+
+    Datasets are expensive to rebuild (a 530k-row log takes over a minute on
+    shared hosting), so additive schema changes are applied in place instead.
+    """
+    conn = connect(dataset_id)
+    try:
+        conn.executescript(MIGRATIONS)
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def set_meta(conn: sqlite3.Connection, values: Dict[str, Any]) -> None:

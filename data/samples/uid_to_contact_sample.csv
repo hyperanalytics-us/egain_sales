@@ -1,0 +1,151 @@
+CRM UID,First Name,Last Name,Email,Company,Job Title,Lifecycle Stage
+01c863da-7591-ef11-ac21-0022482cdce2,Priya,Raman,priya.raman@woodgrovebank.example,Woodgrove Bank,Head of Customer Service,Marketing Qualified
+776852a7-00d5-eb11-8235-0022481ff34f,Marcus,Nair,marcus.nair@contosohealth.example,Contoso Health System,VP Customer Experience,Sales Qualified
+144ee692-4691-ef11-ac21-0022482cdce2,Ana,Petrova,ana.petrova@tailspin.example,Tailspin Insurance,Director of Support Operations,Subscriber
+e87b7481-c892-ef11-ac21-0022482cda5d,Tomas,Sokolov,tomas.sokolov@fabrikam.example,Fabrikam Manufacturing,Knowledge Manager,Opportunity
+4fcc1b96-7077-ef11-a670-0022482cd3d0,Leila,Okafor,leila.okafor@blueyonderhealth.example,Blue Yonder Health Plan,Contact Centre Director,Marketing Qualified
+a30b8e85-5476-e911-a980-000d3a1cbed4,Daniel,Brennan,daniel.brennan@prosewareretail.example,Proseware Retail,CX Transformation Lead,Sales Qualified
+db6dcf5c-bb48-ee11-be6e-0022482cd920,Hannah,Chen,hannah.chen@thephonecompany.example,The Phone Company,Digital Service Manager,Subscriber
+8e7b1a8a-7077-ef11-a670-0022482cd3d0,Rajiv,Mensah,rajiv.mensah@adventureutilities.example,Adventure Utilities,Head of Self-Service,Opportunity
+4d1a5ce0-7591-ef11-ac21-0022482cdce2,Sofia,Haddad,sofia.haddad@northwindfinancial.example,Northwind Financial,Service Desk Manager,Marketing Qualified
+00f24ded-117a-ec11-8d21-000d3a11bbbc,Owen,Bauer,owen.bauer@wideworldimporters.example,Wide World Importers,"Director, Customer Operations",Sales Qualified
+74481d51-748b-ef11-ac21-0022482cd8f5,Naomi,Nkemdirim,naomi.nkemdirim@treycapital.example,Trey Capital Partners,Head of Customer Service,Subscriber
+5b27cdad-440d-ef11-9f8a-0022482cdcf6,Felix,Cabrera,felix.cabrera@relecloudassurance.example,Relecloud Assurance,VP Customer Experience,Opportunity
+1c722c6e-709c-ef11-8a6b-0022482cdce2,Grace,Whitfield,grace.whitfield@litwaresavings.example,Litware Savings,Director of Support Operations,Marketing Qualified
+85af91b6-7591-ef11-ac21-0022482cdce2,Ibrahim,Farouk,ibrahim.farouk@vanarsdel.example,VanArsdel Industries,Knowledge Manager,Sales Qualified
+a6d52027-4791-ef11-ac21-0022482cdce2,Elena,Grant,elena.grant@margiestravel.example,Margie's Travel,Contact Centre Director,Subscriber
+374aa6a4-7591-ef11-ac21-0022482cdce2,Callum,Delgado,callum.delgado@woodgrovebank.example,Woodgrove Bank,CX Transformation Lead,Opportunity
+5d1190c7-daf3-eb11-94ee-000d3a179a59,Mei,Costa,mei.costa@contosohealth.example,Contoso Health System,Digital Service Manager,Marketing Qualified
+a1b4135d-7fe3-eb11-bacb-000d3a4e99b0,Jonas,Doyle,jonas.doyle@tailspin.example,Tailspin Insurance,Head of Self-Service,Sales Qualified
+c1d954ad-cf9d-eb11-b1ac-000d3a134d5c,Amara,Ricci,amara.ricci@fabrikam.example,Fabrikam Manufacturing,Service Desk Manager,Subscriber
+a92e3822-ad77-eb11-b1ab-000d3a1bb78f,Victor,Lindqvist,victor.lindqvist@blueyonderhealth.example,Blue Yonder Health Plan,"Director, Customer Operations",Opportunity
+538d2953-af43-ef11-8409-0022482cd8f5,Isla,Adeyemi,isla.adeyemi@prosewareretail.example,Proseware Retail,Head of Customer Service,Marketing Qualified
+268ba529-0201-ec11-94ef-000d3a18f2e4,Dmitri,Vogel,dmitri.vogel@thephonecompany.example,The Phone Company,VP Customer Experience,Sales Qualified
+51bd135d-7fe3-eb11-bacb-000d3a4e99b0,Chiara,Nyberg,chiara.nyberg@adventureutilities.example,Adventure Utilities,Director of Support Operations,Subscriber
+118056f0-d8d5-eb11-8235-0022481ff1c3,Kwame,Moreau,kwame.moreau@northwindfinancial.example,Northwind Financial,Knowledge Manager,Opportunity
+df486173-3ff9-eb11-94ee-000d3a18f2e4,Freya,Sullivan,freya.sullivan@wideworldimporters.example,Wide World Importers,Contact Centre Director,Marketing Qualified
+a48d26ed-10b0-ea11-a812-000d3a1bb0e7,Andres,Almeida,andres.almeida@treycapital.example,Trey Capital Partners,CX Transformation Lead,Sales Qualified
+066fb842-16cd-eb11-8235-002248240de0,Yuki,Raman,yuki.raman@relecloudassurance.example,Relecloud Assurance,Digital Service Manager,Subscriber
+40156a6b-41f3-ee11-904c-0022482cdcf6,Nadia,Nair,nadia.nair@litwaresavings.example,Litware Savings,Head of Self-Service,Opportunity
+9e39f744-7591-ef11-ac21-0022482cdce2,Liam,Petrova,liam.petrova@vanarsdel.example,VanArsdel Industries,Service Desk Manager,Marketing Qualified
+047388e2-4691-ef11-ac21-0022482cdce2,Rosa,Sokolov,rosa.sokolov@margiestravel.example,Margie's Travel,"Director, Customer Operations",Sales Qualified
+aab3135d-7fe3-eb11-bacb-000d3a4e99b0,Priya,Okafor,priya.okafor@woodgrovebank.example,Woodgrove Bank,Head of Customer Service,Subscriber
+46e6fdf1-bf2c-ef11-840b-0022482cdce2,Marcus,Brennan,marcus.brennan@contosohealth.example,Contoso Health System,VP Customer Experience,Opportunity
+7a2e2508-5042-ec11-8c60-000d3a5364f1,Ana,Chen,ana.chen@tailspin.example,Tailspin Insurance,Director of Support Operations,Marketing Qualified
+3a91da39-eee0-eb11-bacb-000d3a9e9ca3,Tomas,Mensah,tomas.mensah@fabrikam.example,Fabrikam Manufacturing,Knowledge Manager,Sales Qualified
+d0c03708-4af4-eb11-94ee-000d3a179a59,Leila,Haddad,leila.haddad@blueyonderhealth.example,Blue Yonder Health Plan,Contact Centre Director,Subscriber
+297ce7f4-bcfe-eb11-94ee-000d3a18f937,Daniel,Bauer,daniel.bauer@prosewareretail.example,Proseware Retail,CX Transformation Lead,Opportunity
+61a082f3-a0d2-eb11-8235-0022481ff927,Hannah,Nkemdirim,hannah.nkemdirim@thephonecompany.example,The Phone Company,Digital Service Manager,Marketing Qualified
+663a8b12-748b-ef11-ac21-0022482cd8f5,Rajiv,Cabrera,rajiv.cabrera@adventureutilities.example,Adventure Utilities,Head of Self-Service,Sales Qualified
+27c06558-8d8b-ef11-ac21-0022482cd826,Sofia,Whitfield,sofia.whitfield@northwindfinancial.example,Northwind Financial,Service Desk Manager,Subscriber
+ce447098-6f10-ee11-8f6d-0022482cd8f5,Owen,Farouk,owen.farouk@wideworldimporters.example,Wide World Importers,"Director, Customer Operations",Opportunity
+2aaf921f-8853-ef11-a317-0022482cdce2,Naomi,Grant,naomi.grant@treycapital.example,Trey Capital Partners,Head of Customer Service,Marketing Qualified
+c1d954ad-cf9d-eb11-b1ac-000d3a134d5c__;!!CgLlcYu3QJx4GA!4n_EIqurwFI8SJOMk4gjld_g548nzrDAklglOzI4vNa_pDatvI_LJ9MmH9R8Pxbz,Felix,Delgado,felix.delgado@relecloudassurance.example,Relecloud Assurance,VP Customer Experience,Sales Qualified
+980f775b-c2cc-ee11-907a-0022482cd8f5,Grace,Costa,grace.costa@litwaresavings.example,Litware Savings,Director of Support Operations,Subscriber
+177efd7e-8d8b-ef11-ac21-0022482cd826,Ibrahim,Doyle,ibrahim.doyle@vanarsdel.example,VanArsdel Industries,Knowledge Manager,Opportunity
+a928208e-5bbf-ee11-907a-0022482cd826,Elena,Ricci,elena.ricci@margiestravel.example,Margie's Travel,Contact Centre Director,Marketing Qualified
+edeb65da-50e9-ea11-a817-000d3a1bb78f,Callum,Lindqvist,callum.lindqvist@woodgrovebank.example,Woodgrove Bank,CX Transformation Lead,Sales Qualified
+52802271-f9bd-e611-80fd-5065f38a3be1,Mei,Adeyemi,mei.adeyemi@contosohealth.example,Contoso Health System,Digital Service Manager,Subscriber
+a7a7a865-a9aa-ea11-a812-000d3a1bb0e7,Jonas,Vogel,jonas.vogel@tailspin.example,Tailspin Insurance,Head of Self-Service,Opportunity
+4502ed1e-dbd0-ea11-a812-000d3a1b1316,Amara,Nyberg,amara.nyberg@fabrikam.example,Fabrikam Manufacturing,Service Desk Manager,Marketing Qualified
+b3d74e65-8853-ef11-a317-0022482cdce2,Victor,Moreau,victor.moreau@blueyonderhealth.example,Blue Yonder Health Plan,"Director, Customer Operations",Sales Qualified
+0950e886-94c6-ea11-a812-000d3a1bb0e7,Isla,Sullivan,isla.sullivan@prosewareretail.example,Proseware Retail,Head of Customer Service,Subscriber
+87519a29-fc26-e311-8b3a-78e3b517ecb7,Dmitri,Almeida,dmitri.almeida@thephonecompany.example,The Phone Company,VP Customer Experience,Opportunity
+36ac353a-7691-ef11-ac21-0022482cdce2,Chiara,Raman,chiara.raman@adventureutilities.example,Adventure Utilities,Director of Support Operations,Marketing Qualified
+d62533eb-7875-e911-a983-000d3a1e1ac4,Kwame,Nair,kwame.nair@northwindfinancial.example,Northwind Financial,Knowledge Manager,Sales Qualified
+76d1a12e-b57c-ef11-a670-0022482cda5d,Freya,Petrova,freya.petrova@wideworldimporters.example,Wide World Importers,Contact Centre Director,Subscriber
+e2ea6209-192e-ed11-9db0-002248230dfc,Andres,Sokolov,andres.sokolov@treycapital.example,Trey Capital Partners,CX Transformation Lead,Opportunity
+7af79b22-cde5-ed11-a7c6-0022482cd24e,Yuki,Okafor,yuki.okafor@relecloudassurance.example,Relecloud Assurance,Digital Service Manager,Marketing Qualified
+6a6adce6-4fd2-ee11-907a-0022482cd826,Nadia,Brennan,nadia.brennan@litwaresavings.example,Litware Savings,Head of Self-Service,Sales Qualified
+2f1c59fc-8d88-ee11-8179-0022482cdcf6,Liam,Chen,liam.chen@vanarsdel.example,VanArsdel Industries,Service Desk Manager,Subscriber
+41b3f556-7591-ef11-ac21-0022482cdce2,Rosa,Mensah,rosa.mensah@margiestravel.example,Margie's Travel,"Director, Customer Operations",Opportunity
+c6dad032-64e9-ea11-a817-000d3a1b195e,Priya,Haddad,priya.haddad@woodgrovebank.example,Woodgrove Bank,Head of Customer Service,Marketing Qualified
+dede009d-57d6-ee11-907a-0022482cd920,Marcus,Bauer,marcus.bauer@contosohealth.example,Contoso Health System,VP Customer Experience,Sales Qualified
+63fee8a6-aac5-ea11-a812-000d3a1bb420,Ana,Nkemdirim,ana.nkemdirim@tailspin.example,Tailspin Insurance,Director of Support Operations,Subscriber
+7525f4f0-5476-eb11-b1ab-000d3a1bb78f,Tomas,Cabrera,tomas.cabrera@fabrikam.example,Fabrikam Manufacturing,Knowledge Manager,Opportunity
+78595215-b54f-ed11-bba2-0022482cd826,Leila,Whitfield,leila.whitfield@blueyonderhealth.example,Blue Yonder Health Plan,Contact Centre Director,Marketing Qualified
+374b1acb-0dba-ee11-a569-0022482cdcf6,Daniel,Farouk,daniel.farouk@prosewareretail.example,Proseware Retail,CX Transformation Lead,Sales Qualified
+ec37ee55-022c-ef11-840b-0022482cdcf6,Hannah,Grant,hannah.grant@thephonecompany.example,The Phone Company,Digital Service Manager,Subscriber
+d48bda39-eee0-eb11-bacb-000d3a9e9ca3,Rajiv,Delgado,rajiv.delgado@adventureutilities.example,Adventure Utilities,Head of Self-Service,Opportunity
+a37b65b3-3b21-ec11-b6e5-00224824a2bc,Sofia,Costa,sofia.costa@northwindfinancial.example,Northwind Financial,Service Desk Manager,Marketing Qualified
+72ea5419-03eb-eb11-bacb-00224824cdee,Owen,Doyle,owen.doyle@wideworldimporters.example,Wide World Importers,"Director, Customer Operations",Sales Qualified
+af0c39c2-4691-ef11-ac21-0022482cdce2,Naomi,Ricci,naomi.ricci@treycapital.example,Trey Capital Partners,Head of Customer Service,Subscriber
+ff76a42d-b648-e311-ab6b-6c3be5befe08,Felix,Lindqvist,felix.lindqvist@relecloudassurance.example,Relecloud Assurance,VP Customer Experience,Opportunity
+d2d1bd43-d59d-eb11-b1ac-000d3a13413d,Grace,Adeyemi,grace.adeyemi@litwaresavings.example,Litware Savings,Director of Support Operations,Marketing Qualified
+ab1bf4ff-a5f8-ec11-bb3d-00224825b15d,Ibrahim,Vogel,ibrahim.vogel@vanarsdel.example,VanArsdel Industries,Knowledge Manager,Sales Qualified
+2c562b74-63e9-ea11-a817-000d3a1b195e,Elena,Nyberg,elena.nyberg@margiestravel.example,Margie's Travel,Contact Centre Director,Subscriber
+87a733f7-79e9-eb11-bacb-00224824c867,Callum,Moreau,callum.moreau@woodgrovebank.example,Woodgrove Bank,CX Transformation Lead,Opportunity
+e0558b94-cfd0-ea11-a812-000d3a1b195e,Mei,Sullivan,mei.sullivan@contosohealth.example,Contoso Health System,Digital Service Manager,Marketing Qualified
+fe4e8924-7691-ef11-ac21-0022482cdce2,Jonas,Almeida,jonas.almeida@tailspin.example,Tailspin Insurance,Head of Self-Service,Sales Qualified
+2160e692-4691-ef11-ac21-0022482cdce2,Amara,Raman,amara.raman@fabrikam.example,Fabrikam Manufacturing,Service Desk Manager,Subscriber
+139c740b-5476-eb11-b1ab-000d3a1bb78f,Victor,Nair,victor.nair@blueyonderhealth.example,Blue Yonder Health Plan,"Director, Customer Operations",Opportunity
+8fec68b6-50e9-ea11-a817-000d3a1bb78f,Isla,Petrova,isla.petrova@prosewareretail.example,Proseware Retail,Head of Customer Service,Marketing Qualified
+54f1cd48-fac4-ee11-907a-0022482cd920,Dmitri,Sokolov,dmitri.sokolov@thephonecompany.example,The Phone Company,VP Customer Experience,Sales Qualified
+06f77312-dde3-ed11-a7c6-0022482cda5d,Chiara,Okafor,chiara.okafor@adventureutilities.example,Adventure Utilities,Director of Support Operations,Subscriber
+b6d55798-548b-ef11-ac21-0022482cd826,Kwame,Brennan,kwame.brennan@northwindfinancial.example,Northwind Financial,Knowledge Manager,Opportunity
+aea1a142-748b-ef11-ac21-0022482cd8f5,Freya,Chen,freya.chen@wideworldimporters.example,Wide World Importers,Contact Centre Director,Marketing Qualified
+84654340-7691-ef11-ac21-0022482cdce2,Andres,Mensah,andres.mensah@treycapital.example,Trey Capital Partners,CX Transformation Lead,Sales Qualified
+945df223-b253-ef11-a317-0022482cd8f5,Yuki,Haddad,yuki.haddad@relecloudassurance.example,Relecloud Assurance,Digital Service Manager,Subscriber
+3a9cc980-cc11-ed11-b83b-000d3a8b4ff6,Nadia,Bauer,nadia.bauer@litwaresavings.example,Litware Savings,Head of Self-Service,Opportunity
+dd32efd4-4691-ef11-ac21-0022482cdce2,Liam,Nkemdirim,liam.nkemdirim@vanarsdel.example,VanArsdel Industries,Service Desk Manager,Marketing Qualified
+ba1f092f-9853-ef11-a317-0022482cd8f5,Rosa,Cabrera,rosa.cabrera@margiestravel.example,Margie's Travel,"Director, Customer Operations",Sales Qualified
+3d28efd4-4691-ef11-ac21-0022482cdce2,Priya,Whitfield,priya.whitfield@woodgrovebank.example,Woodgrove Bank,Head of Customer Service,Subscriber
+85817481-c892-ef11-ac21-0022482cda5d,Marcus,Farouk,marcus.farouk@contosohealth.example,Contoso Health System,VP Customer Experience,Opportunity
+3990da39-eee0-eb11-bacb-000d3a9e9ca3,Ana,Grant,ana.grant@tailspin.example,Tailspin Insurance,Director of Support Operations,Marketing Qualified
+1ffe9b22-cde5-ed11-a7c6-0022482cd24e,Tomas,Delgado,tomas.delgado@fabrikam.example,Fabrikam Manufacturing,Knowledge Manager,Sales Qualified
+1d8d16bf-b4db-e911-a9a2-000d3a1e1c9a,Leila,Costa,leila.costa@blueyonderhealth.example,Blue Yonder Health Plan,Contact Centre Director,Subscriber
+daf439c5-b6d8-eb11-bacb-000d3a17e179,Daniel,Doyle,daniel.doyle@prosewareretail.example,Proseware Retail,CX Transformation Lead,Opportunity
+d097f887-aac5-ea11-a812-000d3a1bb420,Hannah,Ricci,hannah.ricci@thephonecompany.example,The Phone Company,Digital Service Manager,Marketing Qualified
+d85e8924-7691-ef11-ac21-0022482cdce2,Rajiv,Lindqvist,rajiv.lindqvist@adventureutilities.example,Adventure Utilities,Head of Self-Service,Sales Qualified
+1150e886-94c6-ea11-a812-000d3a1bb0e7,Sofia,Adeyemi,sofia.adeyemi@northwindfinancial.example,Northwind Financial,Service Desk Manager,Subscriber
+bb6388e2-4691-ef11-ac21-0022482cdce2,Owen,Vogel,owen.vogel@wideworldimporters.example,Wide World Importers,"Director, Customer Operations",Opportunity
+b341e5e3-3726-ea11-a813-000d3a1b195e,Naomi,Nyberg,naomi.nyberg@treycapital.example,Trey Capital Partners,Head of Customer Service,Marketing Qualified
+9803ed1e-dbd0-ea11-a812-000d3a1b1316,Felix,Moreau,felix.moreau@relecloudassurance.example,Relecloud Assurance,VP Customer Experience,Sales Qualified
+7a24440c-8a68-ee11-9ae7-0022482cd826,Grace,Sullivan,grace.sullivan@litwaresavings.example,Litware Savings,Director of Support Operations,Subscriber
+923441b0-6b90-ef11-ac21-0022482cda5d,Ibrahim,Almeida,ibrahim.almeida@vanarsdel.example,VanArsdel Industries,Knowledge Manager,Opportunity
+fcfcb03e-7077-ef11-a670-0022482cd3d0,Elena,Raman,elena.raman@margiestravel.example,Margie's Travel,Contact Centre Director,Marketing Qualified
+0a7388e2-4691-ef11-ac21-0022482cdce2,Callum,Nair,callum.nair@woodgrovebank.example,Woodgrove Bank,CX Transformation Lead,Sales Qualified
+4dce610b-74ab-ec11-9841-000d3a1573f4,Mei,Petrova,mei.petrova@contosohealth.example,Contoso Health System,Digital Service Manager,Subscriber
+37b6135d-7fe3-eb11-bacb-000d3a4e99b0,Jonas,Sokolov,jonas.sokolov@tailspin.example,Tailspin Insurance,Head of Self-Service,Opportunity
+93e86640-ced2-ea11-a812-000d3a1b1316,Amara,Okafor,amara.okafor@fabrikam.example,Fabrikam Manufacturing,Service Desk Manager,Marketing Qualified
+0ce468b6-50e9-ea11-a817-000d3a1bb78f,Victor,Brennan,victor.brennan@blueyonderhealth.example,Blue Yonder Health Plan,"Director, Customer Operations",Sales Qualified
+5718fe1c-f33e-ef11-840a-0022482cda5d,Isla,Chen,isla.chen@prosewareretail.example,Proseware Retail,Head of Customer Service,Subscriber
+019c740b-5476-eb11-b1ab-000d3a1bb78f,Dmitri,Mensah,dmitri.mensah@thephonecompany.example,The Phone Company,VP Customer Experience,Opportunity
+e387211c-e476-ed11-81ab-0022482cd826,Chiara,Haddad,chiara.haddad@adventureutilities.example,Adventure Utilities,Director of Support Operations,Marketing Qualified
+0b8c211c-e476-ed11-81ab-0022482cd826,Kwame,Bauer,kwame.bauer@northwindfinancial.example,Northwind Financial,Knowledge Manager,Sales Qualified
+3a66aa39-5f68-ee11-9ae7-0022482cd920,Freya,Nkemdirim,freya.nkemdirim@wideworldimporters.example,Wide World Importers,Contact Centre Director,Subscriber
+1c644340-7691-ef11-ac21-0022482cdce2,Andres,Cabrera,andres.cabrera@treycapital.example,Trey Capital Partners,CX Transformation Lead,Opportunity
+34aff556-7591-ef11-ac21-0022482cdce2,Yuki,Whitfield,yuki.whitfield@relecloudassurance.example,Relecloud Assurance,Digital Service Manager,Marketing Qualified
+6adf13bf-a78c-eb11-b1ad-000d3a1bb0e7__,Nadia,Farouk,nadia.farouk@litwaresavings.example,Litware Savings,Head of Self-Service,Sales Qualified
+dd2939c2-4691-ef11-ac21-0022482cdce2,Liam,Grant,liam.grant@vanarsdel.example,VanArsdel Industries,Service Desk Manager,Subscriber
+60321645-a9aa-ea11-a812-000d3a1bb0e7,Rosa,Delgado,rosa.delgado@margiestravel.example,Margie's Travel,"Director, Customer Operations",Opportunity
+0001d5f2-a505-eb11-a812-000d3a1b195e,Priya,Costa,priya.costa@woodgrovebank.example,Woodgrove Bank,Head of Customer Service,Marketing Qualified
+0002721e-de9e-ec11-b400-000d3a4f0524,Marcus,Doyle,marcus.doyle@contosohealth.example,Contoso Health System,VP Customer Experience,Sales Qualified
+0008a6f5-8817-e811-8157-e0071b6a92f1,Ana,Ricci,ana.ricci@tailspin.example,Tailspin Insurance,Director of Support Operations,Subscriber
+000c4a69-745d-ee11-be6f-0022482cd3d0,Tomas,Lindqvist,tomas.lindqvist@fabrikam.example,Fabrikam Manufacturing,Knowledge Manager,Opportunity
+000dfd19-f0f1-ea11-a815-000d3a1bb0e7,Leila,Adeyemi,leila.adeyemi@blueyonderhealth.example,Blue Yonder Health Plan,Contact Centre Director,Marketing Qualified
+000e75fa-7591-ef11-ac21-0022482cdce2,Daniel,Vogel,daniel.vogel@prosewareretail.example,Proseware Retail,CX Transformation Lead,Sales Qualified
+000efd19-f0f1-ea11-a815-000d3a1bb0e7,Hannah,Nyberg,hannah.nyberg@thephonecompany.example,The Phone Company,Digital Service Manager,Subscriber
+0010ac36-748b-ef11-ac21-0022482cd8f5,Rajiv,Moreau,rajiv.moreau@adventureutilities.example,Adventure Utilities,Head of Self-Service,Opportunity
+0011e354-378b-ef11-ac21-0022482cd8f5,Sofia,Sullivan,sofia.sullivan@northwindfinancial.example,Northwind Financial,Service Desk Manager,Marketing Qualified
+0014e114-2deb-ef11-a731-7c1e525a6e18,Owen,Almeida,owen.almeida@wideworldimporters.example,Wide World Importers,"Director, Customer Operations",Sales Qualified
+0015fa50-6153-ef11-a317-0022482cd3d0,Naomi,Raman,naomi.raman@treycapital.example,Trey Capital Partners,Head of Customer Service,Subscriber
+0016ae0e-64e9-ea11-a817-000d3a1b195e,Felix,Nair,felix.nair@relecloudassurance.example,Relecloud Assurance,VP Customer Experience,Opportunity
+00173905-f1d5-ec11-a7b5-000d3a1c0749,Grace,Petrova,grace.petrova@litwaresavings.example,Litware Savings,Director of Support Operations,Marketing Qualified
+001a59fc-8d88-ee11-8179-0022482cdcf6,Ibrahim,Sokolov,ibrahim.sokolov@vanarsdel.example,VanArsdel Industries,Knowledge Manager,Sales Qualified
+001b092f-9853-ef11-a317-0022482cd8f5,Elena,Okafor,elena.okafor@margiestravel.example,Margie's Travel,Contact Centre Director,Subscriber
+001dc359-22c4-e911-a99c-000d3a1e1acd,Callum,Brennan,callum.brennan@woodgrovebank.example,Woodgrove Bank,CX Transformation Lead,Opportunity
+001ee114-2deb-ef11-a731-7c1e525a6e18,Mei,Chen,mei.chen@contosohealth.example,Contoso Health System,Digital Service Manager,Marketing Qualified
+0021d4a4-4691-ef11-ac21-0022482cdce2,Jonas,Mensah,jonas.mensah@tailspin.example,Tailspin Insurance,Head of Self-Service,Sales Qualified
+0023ee81-ac43-ef11-840a-0022482cdce2,Amara,Haddad,amara.haddad@fabrikam.example,Fabrikam Manufacturing,Service Desk Manager,Subscriber
+00272bc8-87d8-e911-a9a1-000d3a1e1acd,Victor,Bauer,victor.bauer@blueyonderhealth.example,Blue Yonder Health Plan,"Director, Customer Operations",Opportunity
+00298ee4-37ef-eb11-bacb-000d3a12458d,Isla,Nkemdirim,isla.nkemdirim@prosewareretail.example,Proseware Retail,Head of Customer Service,Marketing Qualified
+002d1052-6735-ef11-840a-0022482cdce2,Dmitri,Cabrera,dmitri.cabrera@thephonecompany.example,The Phone Company,VP Customer Experience,Sales Qualified
+002eee3e-14bb-ee11-a569-0022482cdcf6,Chiara,Whitfield,chiara.whitfield@adventureutilities.example,Adventure Utilities,Director of Support Operations,Subscriber
+00303aad-3035-ee11-bdf4-0022482cda5d,Kwame,Farouk,kwame.farouk@northwindfinancial.example,Northwind Financial,Knowledge Manager,Opportunity
+00318b12-748b-ef11-ac21-0022482cd8f5,Freya,Grant,freya.grant@wideworldimporters.example,Wide World Importers,Contact Centre Director,Marketing Qualified
+003261c0-c1eb-ef11-be20-7c1e521a021b,Andres,Delgado,andres.delgado@treycapital.example,Trey Capital Partners,CX Transformation Lead,Sales Qualified
+00328b12-748b-ef11-ac21-0022482cd8f5,Yuki,Costa,yuki.costa@relecloudassurance.example,Relecloud Assurance,Digital Service Manager,Subscriber
+00348b12-748b-ef11-ac21-0022482cd8f5,Nadia,Doyle,nadia.doyle@litwaresavings.example,Litware Savings,Head of Self-Service,Opportunity
+0035ee3e-14bb-ee11-a569-0022482cdcf6,Liam,Ricci,liam.ricci@vanarsdel.example,VanArsdel Industries,Service Desk Manager,Marketing Qualified
+003b4833-7aea-ef11-a731-7c1e521a021b,Rosa,Lindqvist,rosa.lindqvist@margiestravel.example,Margie's Travel,"Director, Customer Operations",Sales Qualified

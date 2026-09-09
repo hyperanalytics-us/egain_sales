@@ -45,6 +45,9 @@ const API = {
   pages(p)              { return this.d('/pages', p); },
   recommendations()     { return this.d('/recommendations'); },
   ipMapStatus()         { return this.d('/ip-map'); },
+  uidMapStatus()        { return this.d('/uid-map'); },
+  clearUidMap()         { return this.del(`/api/${this.ds}/uid-map`); },
+  campaignContacts(p)   { return this.d('/campaign-contacts', p); },
   clearIpMap()          { return this.del(`/api/${this.ds}/ip-map`); },
   askStart(question, sid) { return this.post(`/api/${this.ds}/ask`, { question, session_id: sid }); },
 

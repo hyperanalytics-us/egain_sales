@@ -44,6 +44,21 @@ The 530k-row reference log parses, classifies, scores and indexes in about 35 se
 a peak of 170 MB of memory — rows stream into SQLite and the per-IP rollup runs as `GROUP BY`,
 so memory stays flat no matter how many visitors the log contains.
 
+### CRM UID → contact mapping (optional)
+
+Marketing-email links carry a `uid=` parameter identifying the recipient, so a CRM
+export turns anonymous clicks into named people — stronger identity resolution than
+reverse-IP lookup. Upload it on **Campaign Prospects**. Any `.xlsx`/`.csv` with a UID
+column plus Name (or First/Last), Email and/or Company; headers are auto-detected.
+
+Sample: **`data/samples/uid_to_contact_sample.csv`** (150 real UIDs from the reference
+log, 120 of whom reached a Contact or Demo page). Regenerate with
+`./.venv/bin/python scripts/make_sample_uid_map.py`.
+
+One caveat the UI makes explicit: a single UID often appears from many IP addresses
+because corporate mail scanners follow links automatically. The **Reach** column flags
+that, so a high click count is not mistaken for enthusiasm.
+
 ### IP → domain / client mapping (optional)
 
 A ready-made test file lives at **`data/samples/ip_to_client_sample.csv`** — 60 real
@@ -70,7 +85,7 @@ table resolves to named accounts and the **Named only** filter becomes useful.
 | **Dashboard** | KPI strip plus a pie per prospect dimension — Industry, Product, Campaign, IP, Sources — each with a Chart/Table toggle, and daily request volume. Clicking a slice jumps to that filtered prospect list. |
 | **Industry Prospects** | Vertical share pie + ranking bar + the industry prospect table, with the IP-mapping uploader and a filterable, exportable prospect list. |
 | **Product Prospects** | Same pattern, by product/solution line. |
-| **Campaign Prospects** | Same pattern, by `utm_campaign`, plus CRM UID counts per campaign. |
+| **Campaign Prospects** | Same pattern, by `utm_campaign`, plus a **Who we are targeting** table: upload a CRM export of `uid` → contact and every campaign click resolves to a named person, their company, title and email. |
 | **Recommendations** | Prioritised sales motion, then a block per tier (A-Immediate, A-High, B-Warm, C-Nurture) with its top 25 accounts, the scoring guide, and the data caveats. |
 | **ASK AI** | Ask anything about the loaded log. Claude queries the dataset and answers with prose, tables and charts. Follow-ups reuse the session. |
 | **Top Sources** | Source-class pie, top referrers bar, and the Top 500 referring hosts with prospect counts. |

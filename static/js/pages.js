@@ -9,11 +9,13 @@ const Pages = (() => {
     avg_score: 'Avg score', named_accounts: 'Named accounts', intent_ips: 'Prospect IPs',
     ref_host: 'Referrer host', unique_ips: 'Unique IPs', top_intent_pages: 'Top intent pages',
     why: 'Why sales should care', next_action: 'Next action', score_components: 'Score components',
-    key: 'Name', ips: 'IPs', uids: 'CRM UIDs',
+    key: 'Name', ips: 'IPs', uids: 'CRM UIDs', identified: 'Named contacts',
+    best_tier: 'Best tier', best_score: 'Best score', reach: 'Reach',
+    contact: 'Contact / Lead', contact_company: 'Contact company',
   };
 
   const DEFAULT_PROSPECT_COLS = [
-    'rank', 'tier', 'score', 'ip', 'company', 'domain', 'source', 'uid', 'campaign',
+    'rank', 'tier', 'score', 'ip', 'company', 'contact', 'domain', 'source', 'uid', 'campaign',
     'products', 'industries', 'demo_views', 'contact_views', 'page_views', 'sessions',
     'active_days', 'first_visit', 'last_visit', 'crawler_risk', 'why', 'next_action',
   ];
@@ -134,6 +136,148 @@ const Pages = (() => {
     }
     load();
     root.setFilter = (patch) => { Object.assign(state, patch, { offset: 0 }); load(); root.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    return root;
+  }
+
+  /* ------------------------------------------- CRM UID → contact upload -- */
+  function uidMapPanel(onDone) {
+    const card = h(`<div class="card" style="margin-bottom:16px">
+      <h3>Campaign targets<span class="spacer"></span>
+        <button class="btn sm" data-clear>Clear</button>
+        <button class="btn sm primary" data-up>Upload CRM UID → contact file</button>
+      </h3>
+      <div class="body" data-status><span class="spinner"></span></div>
+    </div>`);
+    const status = card.querySelector('[data-status]');
+
+    async function refresh() {
+      try {
+        const s = await API.uidMapStatus();
+        status.innerHTML = s.mapping_size
+          ? `<div class="note small" style="margin:0">Contact list loaded: <b>${num(s.mapping_size)}</b> UIDs,
+             <b>${num(s.matched_uids)}</b> matched to clicks in this log, and
+             <b>${num(s.reached_contact_or_demo)}</b> of those people went on to a Contact or Demo page.
+             Names now appear below and in every prospect table.</div>`
+          : `<div class="note small warn" style="margin:0">No contact list uploaded. This log carries
+             <b>${num(s.uids_in_log)}</b> distinct campaign UIDs from <code>uid=</code> links — export those
+             contacts from your marketing automation or CRM (columns like <code>UID</code>, <code>Name</code>,
+             <code>Email</code>, <code>Company</code>) and upload to see who you are actually targeting.</div>`;
+      } catch (e) { status.innerHTML = ''; status.appendChild(errorBox(e)); }
+    }
+    refresh();
+
+    card.querySelector('[data-up]').onclick = () => {
+      const body = h(`<div>
+        <p class="muted small" style="margin-top:0">Any .xlsx or .csv with a UID column plus a Name,
+        Email and/or Company column. Headers are auto-detected — <code>UID</code>, <code>CRM UID</code>,
+        <code>Contact ID</code> and <code>Recipient ID</code> all work, as do separate
+        <code>First Name</code> / <code>Last Name</code> columns.</p>
+        <div class="drop" data-drop>Click to choose a file, or drop it here</div>
+        <label style="display:block;margin-top:12px"><input type="checkbox" data-replace> Replace the existing contact list</label>
+        <input type="file" accept=".xlsx,.xlsm,.csv,.tsv,.txt" style="display:none" data-file>
+        <div data-out style="margin-top:12px"></div>
+      </div>`);
+      const { close } = UI.modal('Upload CRM UID → contact mapping', body);
+      const file = body.querySelector('[data-file]');
+      const drop = body.querySelector('[data-drop]');
+      const out = body.querySelector('[data-out]');
+      drop.onclick = () => file.click();
+      drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+      drop.ondragleave = () => drop.classList.remove('over');
+      drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) send(e.dataTransfer.files[0]); };
+      file.onchange = () => file.files[0] && send(file.files[0]);
+
+      async function send(f) {
+        out.innerHTML = ''; out.appendChild(loading('Matching UIDs…'));
+        const fd = new FormData();
+        fd.append('file', f);
+        fd.append('replace', body.querySelector('[data-replace]').checked ? 'true' : 'false');
+        try {
+          const r = await API.form(`/api/${API.ds}/uid-map`, fd);
+          out.innerHTML = `<div class="note small" style="margin:0">Loaded <b>${num(r.rows_loaded)}</b> contacts
+            (${num(r.skipped_rows)} skipped). <b>${num(r.matched_uids)}</b> matched clicks in this log across
+            <b>${num(r.campaigns_covered)}</b> campaign(s); <b>${num(r.reached_contact_or_demo)}</b> reached a
+            Contact or Demo page. Columns used: UID=<code>${esc(r.columns_used.uid)}</code>,
+            Contact=<code>${esc(r.columns_used.contact || '—')}</code>,
+            Email=<code>${esc(r.columns_used.email || '—')}</code>,
+            Company=<code>${esc(r.columns_used.company || '—')}</code>.</div>`;
+          refresh();
+          setTimeout(() => { close(); onDone && onDone(); }, 1600);
+        } catch (e) { out.innerHTML = ''; out.appendChild(errorBox(e)); }
+      }
+    };
+
+    card.querySelector('[data-clear]').onclick = async () => {
+      if (!confirm('Remove the uploaded CRM contact list from this dataset?')) return;
+      await API.clearUidMap(); refresh(); onDone && onDone();
+    };
+    return card;
+  }
+
+  /* ---------------------------------------------- campaign contact list --- */
+  function contactPane(campaign) {
+    const state = { campaign: campaign || null, limit: 100, offset: 0, identified_only: true };
+    const root = h(`<div class="card" style="margin-bottom:16px">
+      <h3>Who we are targeting<span class="spacer"></span><span class="small muted" data-count></span></h3>
+      <div class="body"><div class="filters">
+        <label class="field"><span>Show</span>
+          <select data-f="identified_only">
+            <option value="true" selected>Named contacts only</option>
+            <option value="false">All UIDs, named or not</option>
+          </select></label>
+        <label class="field"><span>Behaviour</span>
+          <select data-f="converted_only">
+            <option value="false" selected>All clicks</option>
+            <option value="true">Reached Contact or Demo</option>
+          </select></label>
+        <label class="field"><span>Search</span>
+          <input type="search" data-f="search" placeholder="name, company, email…" style="width:200px"></label>
+      </div>
+      <div class="note small" style="margin:0 0 6px">A UID identifies the person the email was sent to. One
+      UID can appear from many IP addresses because corporate mail scanners follow links automatically —
+      the <b>Reach</b> column flags that, so a high click count is not mistaken for enthusiasm.</div>
+      </div>
+      <div data-rows></div>
+      <div class="body" data-pager style="display:flex;gap:10px;align-items:center"></div>
+    </div>`);
+    const rowsPane = root.querySelector('[data-rows]');
+    const pager = root.querySelector('[data-pager]');
+    let timer = null;
+    root.querySelector('.filters').addEventListener('input', (e) => {
+      const f = e.target.dataset.f; if (!f) return;
+      let v = e.target.value;
+      if (f === 'identified_only' || f === 'converted_only') v = (v === 'true');
+      state[f] = v; state.offset = 0;
+      clearTimeout(timer); timer = setTimeout(load, e.target.type === 'search' ? 320 : 0);
+    });
+
+    async function load() {
+      rowsPane.innerHTML = ''; rowsPane.appendChild(loading());
+      try {
+        const d = await API.campaignContacts(state);
+        rowsPane.innerHTML = '';
+        if (!d.mapping.mapped) {
+          rowsPane.appendChild(h(`<div class="empty">Upload a CRM UID → contact file above to put names
+            against the ${num(d.mapping.total_uids)} campaign UIDs in this log.</div>`));
+          root.querySelector('[data-count]').textContent = '';
+          pager.innerHTML = ''; return;
+        }
+        rowsPane.appendChild(UI.table(d.columns, d.rows, { headers: PROSPECT_HEADERS }));
+        root.querySelector('[data-count]').textContent =
+          `${num(d.total)} people — ${num(d.mapping.matched_uids)} of ${num(d.mapping.total_uids)} UIDs named, ` +
+          `${num(d.mapping.converted)} reached Contact/Demo`;
+        pager.innerHTML = '';
+        const prev = h('<button class="btn sm">← Previous</button>');
+        const next = h('<button class="btn sm">Next →</button>');
+        prev.disabled = state.offset === 0;
+        next.disabled = state.offset + state.limit >= d.total;
+        prev.onclick = () => { state.offset = Math.max(0, state.offset - state.limit); load(); };
+        next.onclick = () => { state.offset += state.limit; load(); };
+        pager.append(prev, next);
+      } catch (e) { rowsPane.innerHTML = ''; rowsPane.appendChild(errorBox(e)); }
+    }
+    load();
+    root.setCampaign = (c) => { state.campaign = c || null; state.offset = 0; load(); };
     return root;
   }
 
@@ -277,9 +421,10 @@ const Pages = (() => {
       view.innerHTML = '';
       view.appendChild(h(`<div class="note small">${esc(conf.lead)}</div>`));
 
-      let pane;
+      let pane, contacts;
       const rerender = () => App.render();
       view.appendChild(ipMapPanel(rerender));
+      if (kind === 'campaign') view.appendChild(uidMapPanel(rerender));
 
       const slices = data.rows.slice(0, 10).map((r) => ({ label: r.key, value: r.prospects }));
       const rest = data.rows.slice(10).reduce((a, r) => a + (r.prospects || 0), 0);
@@ -289,8 +434,15 @@ const Pages = (() => {
       grid.appendChild(UI.chartTableCard({
         title: `${conf.title} — share`, slices, columns: data.columns, rows: data.rows,
         headers: PROSPECT_HEADERS,
-        onSlice: (s) => !String(s.label).startsWith('Other (') && pane.setFilter({ [conf.filter]: s.label }),
-        onRow: (r) => pane.setFilter({ [conf.filter]: r.key }),
+        onSlice: (s) => {
+          if (String(s.label).startsWith('Other (')) return;
+          pane.setFilter({ [conf.filter]: s.label });
+          if (contacts) contacts.setCampaign(s.label);
+        },
+        onRow: (r) => {
+          pane.setFilter({ [conf.filter]: r.key });
+          if (contacts) contacts.setCampaign(r.key);
+        },
         note: 'Click a slice or a table row to filter the prospect list below.',
       }));
       const barCard = h(`<div class="card"><h3>Prospects by ${esc(kind)}</h3><div class="body"><div class="chart-wrap tall"><canvas></canvas></div></div></div>`);
@@ -312,7 +464,15 @@ const Pages = (() => {
       </div>`);
       view.appendChild(bar2);
       pane = prospectPane(selected ? { [conf.filter]: selected } : {}, { title: `${conf.title} — prospect list` });
-      bar2.querySelector('[data-pick]').onchange = (e) => pane.setFilter({ [conf.filter]: e.target.value || null });
+      if (kind === 'campaign') {
+        contacts = contactPane(selected);
+        view.appendChild(contacts);
+      }
+      bar2.querySelector('[data-pick]').onchange = (e) => {
+        const v = e.target.value || null;
+        pane.setFilter({ [conf.filter]: v });
+        if (contacts) contacts.setCampaign(v);
+      };
       view.appendChild(pane);
     };
   }

@@ -355,6 +355,66 @@ def upload_ip_map(dataset_id: str, file: UploadFile = File(...), replace: bool =
     return result
 
 
+@app.get("/api/{dataset_id}/campaign-contacts")
+def campaign_contacts(
+    ctx=Depends(dataset_conn),
+    campaign: Optional[str] = None,
+    limit: int = Query(200, ge=1, le=2000),
+    offset: int = Query(0, ge=0),
+    identified_only: bool = True,
+    converted_only: bool = False,
+    search: Optional[str] = None,
+):
+    _, conn = ctx
+    return reports.campaign_contacts(conn, campaign=campaign, limit=limit, offset=offset,
+                                     identified_only=identified_only, converted_only=converted_only,
+                                     search=search)
+
+
+@app.get("/api/{dataset_id}/uid-map")
+def uid_map_status(ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    row = conn.execute(
+        "SELECT (SELECT COUNT(*) FROM uid_map) AS mapping_size, "
+        "(SELECT COUNT(DISTINCT uid) FROM requests WHERE IFNULL(uid,'') <> '') AS uids_in_log, "
+        "(SELECT COUNT(DISTINCT r.uid) FROM requests r JOIN uid_map u ON u.uid = r.uid) AS matched_uids, "
+        "(SELECT COUNT(DISTINCT r.uid) FROM requests r JOIN uid_map u ON u.uid = r.uid "
+        " WHERE r.category IN ('contact','demo')) AS reached_contact_or_demo"
+    ).fetchone()
+    return dict(row)
+
+
+@app.post("/api/{dataset_id}/uid-map")
+def upload_uid_map(dataset_id: str, file: UploadFile = File(...), replace: bool = Form(False)):
+    entry = _resolve_dataset(dataset_id)
+    db.migrate(entry["id"])
+    path = _save_upload(file, "uidmap")
+    conn = db.connect(entry["id"])
+    try:
+        result = enrich.load_uid_map(conn, path, replace=bool(replace))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return result
+
+
+@app.delete("/api/{dataset_id}/uid-map")
+def clear_uid_map(dataset_id: str):
+    entry = _resolve_dataset(dataset_id)
+    conn = db.connect(entry["id"])
+    try:
+        conn.execute("DELETE FROM uid_map")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
 @app.delete("/api/{dataset_id}/ip-map")
 def clear_ip_map(dataset_id: str):
     entry = _resolve_dataset(dataset_id)
@@ -508,6 +568,18 @@ def favicon():
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "datasets": len(db.list_datasets()["datasets"]), "ai_enabled": askai.available(), "auth_required": auth.enabled()}
+
+
+@app.on_event("startup")
+def _migrate_datasets() -> None:
+    """Apply additive schema changes to datasets ingested by an older build."""
+    for entry in db.list_datasets()["datasets"]:
+        if entry.get("status") != "ready":
+            continue
+        try:
+            db.migrate(entry["id"])
+        except Exception as exc:  # noqa: BLE001 - a bad dataset must not stop startup
+            print(f"migration skipped for {entry['id']}: {exc}")
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
