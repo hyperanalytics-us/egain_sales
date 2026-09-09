@@ -45,7 +45,7 @@ const API = {
   pages(p)              { return this.d('/pages', p); },
   recommendations()     { return this.d('/recommendations'); },
   accounts(p)           { return this.d('/accounts', p); },
-  accountDetail(name)   { return this.d(`/account/${encodeURIComponent(name)}`); },
+  accountDetail(name)   { return this.d('/account', { name }); },
   ipMapStatus()         { return this.d('/ip-map'); },
   uidMapStatus()        { return this.d('/uid-map'); },
   clearUidMap()         { return this.del(`/api/${this.ds}/uid-map`); },

@@ -314,12 +314,20 @@ def accounts(ctx=Depends(dataset_conn), search: Optional[str] = None,
     return reports.accounts(conn, search=search, limit=limit, offset=offset)
 
 
-@app.get("/api/{dataset_id}/account/{account}")
-def account_detail(account: str, ctx=Depends(dataset_conn)):
+@app.get("/api/{dataset_id}/account")
+def account_detail(ctx=Depends(dataset_conn), name: str = Query(..., min_length=1)):
+    """Account name travels as a query parameter, never in the path.
+
+    Company names contain spaces and punctuation, and servers disagree about
+    path decoding: under Passenger's WSGI bridge the path arrives still
+    percent-encoded, so a path parameter yielded 'Woodgrove%20Bank' in
+    production while working locally under uvicorn. A query parameter is
+    decoded consistently everywhere.
+    """
     _, conn = ctx
-    detail = reports.account_detail(conn, account)
+    detail = reports.account_detail(conn, name)
     if not detail:
-        raise HTTPException(404, f"No account named '{account}' in this dataset.")
+        raise HTTPException(404, f"No account named '{name}' in this dataset.")
     return detail
 
 
