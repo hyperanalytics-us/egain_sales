@@ -633,3 +633,195 @@ def ai_context(conn: sqlite3.Connection, dataset_name: str) -> str:
         "TIERS: " + "; ".join(f"{t[0]}: {t[1]}" for t in TIER_GUIDE),
     ]
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------- accounts ---
+ACCOUNT_COLUMNS = ["rank", "account", "domain", "best_tier", "best_score", "prospect_ips",
+                   "contacts", "page_views", "sessions", "contact_views", "demo_views",
+                   "products", "industries", "campaigns", "first_seen", "last_seen"]
+
+
+def _account_sources(conn: sqlite3.Connection) -> str:
+    """Companies come from either mapping the rep uploaded."""
+    return """
+        SELECT company FROM ip_map  WHERE IFNULL(company,'') <> ''
+        UNION
+        SELECT company FROM uid_map WHERE IFNULL(company,'') <> ''
+    """
+
+
+def accounts(conn: sqlite3.Connection, search: Optional[str] = None,
+             limit: int = 200, offset: int = 0) -> Dict[str, Any]:
+    """Roll every signal up to the company, not the address.
+
+    A rep thinks in accounts: one company sits behind several addresses and
+    several people. This is the view that answers "what do we know about
+    Woodgrove Bank" rather than "what do we know about 140.89.104.2".
+    """
+    like = f"%{search}%" if search else None
+
+    # Activity, from the addresses mapped to each company.
+    base_rows = conn.execute(
+        """
+        SELECT m.company AS account,
+               COUNT(DISTINCT m.ip)                                   AS ips,
+               SUM(CASE WHEN s.eligible = 1 THEN 1 ELSE 0 END)        AS prospect_ips,
+               SUM(IFNULL(s.page_views, 0))                           AS page_views,
+               SUM(IFNULL(s.sessions, 0))                             AS sessions,
+               SUM(IFNULL(s.contact_views, 0))                        AS contact_views,
+               SUM(IFNULL(s.demo_views, 0))                           AS demo_views,
+               SUM(IFNULL(s.product_views, 0))                        AS product_views,
+               MIN(NULLIF(s.first_ts, 0))                             AS first_ts,
+               MAX(IFNULL(s.last_ts, 0))                              AS last_ts,
+               MAX(IFNULL(m.domain, ''))                              AS domain
+        FROM ip_map m LEFT JOIN ip_stats s ON s.ip = m.ip
+        WHERE IFNULL(m.company,'') <> ''
+        GROUP BY m.company
+        """
+    ).fetchall()
+    base = {r["account"]: dict(r) for r in base_rows}
+
+    # Best-scoring address per account. One aggregate only, so SQLite's bare
+    # column resolves to the row that produced the maximum.
+    for r in conn.execute(
+        """
+        SELECT m.company AS account, MAX(s.score) AS best_score, s.tier AS best_tier, s.ip AS best_ip
+        FROM ip_map m JOIN ip_stats s ON s.ip = m.ip
+        WHERE IFNULL(m.company,'') <> '' AND s.eligible = 1
+        GROUP BY m.company
+        """
+    ):
+        base.setdefault(r["account"], {"account": r["account"]}).update(
+            best_score=r["best_score"], best_tier=r["best_tier"], best_ip=r["best_ip"])
+
+    # People, from the CRM export.
+    for r in conn.execute(
+        "SELECT company AS account, COUNT(*) AS contacts FROM uid_map "
+        "WHERE IFNULL(company,'') <> '' GROUP BY company"
+    ):
+        base.setdefault(r["account"], {"account": r["account"]}).update(contacts=r["contacts"])
+
+    # Interests, campaigns.
+    def top_by(table: str, col: str) -> Dict[str, str]:
+        out: Dict[str, List[str]] = {}
+        for r in conn.execute(
+            f"""SELECT m.company AS account, t.{col} AS v, SUM(t.views) AS n
+                FROM ip_map m JOIN {table} t ON t.ip = m.ip
+                WHERE IFNULL(m.company,'') <> ''
+                GROUP BY m.company, t.{col} ORDER BY m.company, n DESC, t.{col}"""
+        ):
+            out.setdefault(r["account"], [])
+            if len(out[r["account"]]) < 3 and r["v"]:
+                out[r["account"]].append(r["v"])
+        return {k: ", ".join(v) for k, v in out.items()}
+
+    products, industries, campaigns = top_by("ip_product", "product"),         top_by("ip_industry", "industry"), top_by("ip_campaign", "campaign")
+
+    rows: List[Dict[str, Any]] = []
+    for name, d in base.items():
+        if like and like.strip("%").lower() not in name.lower() and            like.strip("%").lower() not in str(d.get("domain", "")).lower():
+            continue
+        rows.append({
+            "account": name,
+            "domain": d.get("domain", "") or "",
+            "best_tier": d.get("best_tier", "") or "",
+            "best_score": d.get("best_score", 0) or 0,
+            "best_ip": d.get("best_ip", ""),
+            "ips": d.get("ips", 0) or 0,
+            "prospect_ips": d.get("prospect_ips", 0) or 0,
+            "contacts": d.get("contacts", 0) or 0,
+            "page_views": d.get("page_views", 0) or 0,
+            "sessions": d.get("sessions", 0) or 0,
+            "contact_views": d.get("contact_views", 0) or 0,
+            "demo_views": d.get("demo_views", 0) or 0,
+            "products": products.get(name, ""),
+            "industries": industries.get(name, ""),
+            "campaigns": campaigns.get(name, ""),
+            "first_seen": _iso(d.get("first_ts")),
+            "last_seen": _iso(d.get("last_ts")),
+        })
+
+    rows.sort(key=lambda r: (-(r["best_score"] or 0), -(r["demo_views"] or 0), r["account"]))
+    total = len(rows)
+    page = rows[offset:offset + limit]
+    for i, r in enumerate(page):
+        r["rank"] = offset + i + 1
+
+    mapped = conn.execute("SELECT COUNT(*) AS n FROM ip_map WHERE IFNULL(company,'') <> ''").fetchone()["n"]
+    contacts_loaded = conn.execute("SELECT COUNT(*) AS n FROM uid_map").fetchone()["n"]
+    return {
+        "columns": ACCOUNT_COLUMNS,
+        "rows": page,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "mapping": {"mapped_ips": mapped, "contacts_loaded": contacts_loaded},
+    }
+
+
+def account_detail(conn: sqlite3.Connection, account: str) -> Dict[str, Any]:
+    """Everything known about one company, gathered in one place."""
+    ips = [dict(r) for r in conn.execute(
+        f"{_BASE_SELECT} WHERE m.company = ? ORDER BY s.score DESC, s.page_views DESC", (account,))]
+    if not ips:
+        exists = conn.execute("SELECT 1 FROM uid_map WHERE company = ? LIMIT 1", (account,)).fetchone()
+        if not exists:
+            return {}
+
+    prospect_rows = [{
+        "rank": i + 1, "ip": r["ip"], "tier": r["tier"], "score": r["score"],
+        "sessions": r["sessions"], "page_views": r["page_views"],
+        "contact_views": r["contact_views"], "demo_views": r["demo_views"],
+        "products": r["products"] or "", "industries": r["industries"] or "",
+        "crawler_risk": r["crawler_risk"], "source": r["source"],
+        "first_visit": _iso(r["first_ts"]), "last_visit": _iso(r["last_ts"]),
+        "why": r["why"] or "",
+    } for i, r in enumerate(ips)]
+
+    ip_list = [r["ip"] for r in ips]
+    ph = ",".join("?" * len(ip_list)) if ip_list else "''"
+
+    contacts = [dict(r) for r in conn.execute(
+        "SELECT uid, contact, email, title FROM uid_map WHERE company = ? ORDER BY contact", (account,))]
+    for c in contacts:
+        act = conn.execute(
+            "SELECT COUNT(*) AS requests, COUNT(DISTINCT ip) AS ips, "
+            "SUM(category='contact') AS contact_views, SUM(category='demo') AS demo_views, "
+            "MIN(ts) AS first_ts, MAX(ts) AS last_ts "
+            "FROM requests WHERE uid = ?", (c["uid"],)).fetchone()
+        c.update(requests=act["requests"] or 0, ips=act["ips"] or 0,
+                 contact_views=act["contact_views"] or 0, demo_views=act["demo_views"] or 0,
+                 first_seen=_iso(act["first_ts"]), last_seen=_iso(act["last_ts"]),
+                 reach=("Likely mail scanner" if (act["ips"] or 0) >= 8 else
+                        "Shared / multiple networks" if (act["ips"] or 0) >= 3 else "Single network"))
+
+    pages, campaigns_seen, sources = [], [], []
+    if ip_list:
+        pages = [dict(r) for r in conn.execute(
+            f"SELECT path, category, product, industry, COUNT(*) AS views, COUNT(DISTINCT ip) AS ips "
+            f"FROM requests WHERE ip IN ({ph}) GROUP BY path ORDER BY views DESC LIMIT 30", ip_list)]
+        campaigns_seen = [dict(r) for r in conn.execute(
+            f"SELECT campaign, COUNT(*) AS requests, COUNT(DISTINCT ip) AS ips, "
+            f"COUNT(DISTINCT NULLIF(uid,'')) AS uids FROM requests WHERE ip IN ({ph}) "
+            f"AND IFNULL(campaign,'') <> '' GROUP BY campaign ORDER BY requests DESC LIMIT 15", ip_list)]
+        sources = [dict(r) for r in conn.execute(
+            f"SELECT source, COUNT(*) AS requests FROM requests WHERE ip IN ({ph}) "
+            f"GROUP BY source ORDER BY requests DESC", ip_list)]
+
+    agg = {
+        "ips": len(ips),
+        "prospect_ips": sum(1 for r in ips if r["eligible"]),
+        "contacts": len(contacts),
+        "best_tier": ips[0]["tier"] if ips else "",
+        "best_score": ips[0]["score"] if ips else 0,
+        "page_views": sum(r["page_views"] for r in ips),
+        "sessions": sum(r["sessions"] for r in ips),
+        "contact_views": sum(r["contact_views"] for r in ips),
+        "demo_views": sum(r["demo_views"] for r in ips),
+        "first_seen": _iso(min((r["first_ts"] for r in ips if r["first_ts"]), default=0)),
+        "last_seen": _iso(max((r["last_ts"] for r in ips), default=0)),
+        "domain": next((r["domain"] for r in ips if r["domain"]), ""),
+        "any_crawler_risk": any(r["crawler_risk"] != "Low" for r in ips),
+    }
+    return {"account": account, "summary": agg, "ips": prospect_rows,
+            "contacts": contacts, "pages": pages, "campaigns": campaigns_seen, "sources": sources}

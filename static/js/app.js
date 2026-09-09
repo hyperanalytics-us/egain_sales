@@ -12,11 +12,13 @@ const App = (() => {
     ai: '<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>',
     sources: '<path d="M12 3v18M3 12h18M5 5l14 14M19 5L5 19"/>',
     ip: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/>',
+    accounts: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h2M9 14h2M13 10h2M13 14h2"/>',
   };
 
   const ROUTES = [
     { id: 'dashboard', title: 'Dashboard', icon: 'dashboard', render: Pages.dashboard, group: 'Overview' },
-    { id: 'industry', title: 'Industry Prospects', icon: 'industry', render: Pages.industry, group: 'Prospects' },
+    { id: 'accounts', title: 'Accounts', icon: 'accounts', render: Pages.accounts, group: 'Prospects' },
+    { id: 'industry', title: 'Industry Prospects', icon: 'industry', render: Pages.industry },
     { id: 'product', title: 'Product Prospects', icon: 'product', render: Pages.product },
     { id: 'campaign', title: 'Campaign Prospects', icon: 'campaign', render: Pages.campaign },
     { id: 'recommendations', title: 'Recommendations', icon: 'recommendations', render: Pages.recommendations, group: 'Action' },

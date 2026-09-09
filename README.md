@@ -1,156 +1,236 @@
 # ESP — eGain Sales Prospects
 
-Turns a raw website-visitor log into a ranked, workable sales prospect list.
+**A prototype that turns raw eGain.com visitor logs into a ranked, searchable prospect list for sales reps.**
 
-Upload a weblog, and ESP classifies every request (product, industry, campaign, conversion
-intent, crawler risk), rolls it up per IP, scores sales intent, and buckets the result into
-A/B/C pipeline tiers. Reps can then resolve IPs to named accounts, drill into any visitor's
-full page history, and ask questions in plain English.
+Upload a weblog and ESP classifies every request, rolls it up per visitor, scores buying intent,
+and organises the result into an A/B/C pipeline a rep can work through. Reps can search by account,
+industry, product, campaign or person, drill into any visitor's full history, and ask questions in
+plain English.
+
+| | |
+|---|---|
+| **Live demo** | **https://hyperanalyticslabs.com/esp/** |
+| **Access** | Password-protected. Credentials are in the submission email — the repository is public, so no password is committed here. |
+| **Reference data** | eGain.com visitor log, 1–25 February 2025 — 530,423 requests, 91,288 addresses |
 
 ---
 
-## Quick start
+## The problem this solves
+
+The log contains a lot of intent data, but **raw request volume is not lead volume.**
+Of the 530,423 requests in the supplied file:
+
+| | |
+|---|---|
+| Requests from declared bots | **105,371** — 19.9% |
+| Unique IP addresses | 91,288 — *not* 91,288 prospects |
+| Addresses showing any real buying signal | **24,044** |
+| Addresses that reached a Contact or Demo page **and** evaluated product content | **694** |
+| Ranked A-tier accounts to work first | **558** |
+
+Everything below exists to get a rep from the first number to the last one.
+
+---
+
+## What a rep can search by
+
+The core question is *"what do we know about this account?"* — so ESP is searchable across
+every attribute that helps answer it:
+
+| Attribute | Where |
+|---|---|
+| **Company / account** | Accounts page — search a target company, see everything behind it |
+| **Person** | Campaign Prospects — search by contact name, email or company |
+| **Industry** | Industry Prospects, plus a filter on every prospect table |
+| **Product interest** | Product Prospects, plus free-text search |
+| **Marketing campaign** | Campaign Prospects, filterable per campaign |
+| **IP address** | IP Analysis, with full per-visitor history |
+| **Traffic source** | Top Sources, plus a filter on every prospect table |
+| **Pipeline tier / intent score** | Filter on every prospect table |
+| **Crawler risk** | Filter on every prospect table |
+| **CRM UID** | Free-text search |
+
+Every list is sortable by any column and exportable to CSV.
+
+---
+
+## The screens
+
+| Menu | What it answers |
+|---|---|
+| **Dashboard** | How much of this traffic is real, and where is the interest concentrated? |
+| **Accounts** | *Everything we know about one target company* — its addresses, its people, the campaigns that reached it, the pages it read |
+| **Industry Prospects** | Which verticals are evaluating us, and who in each? |
+| **Product Prospects** | Which product lines are drawing evaluation? |
+| **Campaign Prospects** | Which campaigns landed — and **who specifically** clicked |
+| **Recommendations** | Who to call first, in what order, and why |
+| **ASK AI** | Any question, answered against the data with charts and tables |
+| **Top Sources** | How are people finding the site? |
+| **IP Analysis** | The full prospect list with every filter, and per-visitor drill-down |
+
+---
+
+## How a visitor gets scored
+
+Each address gets a **Sales Intent Score** from 0–100. Positive signals are summed and capped at
+100, then penalties are applied — so an address that maxes out on intent still falls if it looks
+like a crawler.
+
+| Signal | Weight | | Signal | Weight |
+|---|---|---|---|---|
+| Demo / trial page | +45 | | Repeat sessions and days | up to +16 |
+| Contact page | +35 | | Organic search · LinkedIn | +5 each |
+| Pricing | +20 | | Career-heavy traffic | −15 to −35 |
+| Product / solution depth | up to +20 | | Investor / news-heavy | −10 to −25 |
+| Industry / vertical depth | up to +12 | | Support-heavy | −30 |
+| Case study / proof | up to +12 | | Crawler risk | −10 / −35 |
+| Marketing-email arrival · CRM UID | +10 each | | | |
+
+**Tiers** — A-Immediate (≥75 with a contact or demo view) · A-High (≥60) · B-Warm (45–59) ·
+C-Nurture (below 45, with at least one intent signal).
+
+An address is **eligible** when it shows at least one intent signal and is not a declared bot.
+Every prospect row shows its own score breakdown, so the ranking is auditable rather than a
+black box.
+
+---
+
+## Turning addresses into names
+
+An IP address is not a company and a click is not a person, so ESP does not pretend otherwise.
+It resolves identity from two files the sales team supplies — both optional, both uploaded in
+the browser, both with auto-detected column headers.
+
+**1. IP → client** *(any prospect page)*
+A reverse-IP or ABM export. Exact addresses and CIDR blocks both work. Once loaded, company and
+domain appear in every table, the Accounts page populates, and a named-accounts filter becomes
+available.
+Sample: [`data/samples/ip_to_client_sample.csv`](data/samples/ip_to_client_sample.csv)
+
+**2. CRM UID → contact** *(Campaign Prospects)*
+Marketing-email links carry a `uid=` parameter identifying the **recipient**, which is a far
+stronger identity signal than guessing a company from an address. A CRM export of
+UID → name, email, company and title turns anonymous campaign clicks into named people.
+Sample: [`data/samples/uid_to_contact_sample.csv`](data/samples/uid_to_contact_sample.csv)
+
+Regenerate either sample for a different dataset:
 
 ```bash
-cd egain-sales-prospects && ./run.sh
+./.venv/bin/python scripts/make_sample_ip_map.py
+./.venv/bin/python scripts/make_sample_uid_map.py
 ```
 
-Then open <http://127.0.0.1:8800>. The first run creates `.venv` and installs dependencies.
+---
 
-To enable **ASK AI**, copy `.env.example` to `.env`, add your `ANTHROPIC_API_KEY`, and restart.
-Everything else works without a key.
+## ASK AI
 
-Load a weblog from the command line instead of the browser:
+Ask a question in plain English — *"which ten accounts should I call first this week, and why?"* —
+and ESP queries the dataset directly and answers with prose, charts and tables. Follow-up
+questions keep context. Every SQL query it ran is shown under the answer, so nothing is taken
+on trust.
+
+Runs on `claude-opus-5`. Without an API key configured, this one menu is unavailable and
+everything else works normally.
+
+---
+
+## Running it locally
+
+```bash
+git clone https://github.com/hyperanalytics-us/egain_sales.git
+cd egain_sales
+./run.sh
+```
+
+Open <http://127.0.0.1:8800>. The first run creates a virtualenv and installs three packages.
+
+Load the supplied weblog from the command line, or just upload it in the browser:
 
 ```bash
 ./.venv/bin/python scripts/load_dataset.py "Website visitor IP address log file 1.xlsx" "Feb 2025 log"
 ```
 
+Optional configuration in `.env` (see `.env.example`):
+
+| Variable | Purpose |
+|---|---|
+| `ESP_PASSWORD` | Shared password. **Set this before any public deployment** — without it, the app is open |
+| `ANTHROPIC_API_KEY` | Enables ASK AI |
+| `ESP_SECRET` | Session signing key, so logins survive a restart |
+| `ESP_AI_EFFORT` | ASK AI depth vs speed: `low` … `xhigh` (default `medium`) |
+| `ESP_MAX_UPLOAD_MB` | Upload ceiling (default 50) |
+
 ---
 
-## Inputs
+## Input format
 
-### Weblog (required)
-
-Fixed 7-column layout, `.xlsx` or `.csv`, **up to 50 MB** (larger files are rejected with an
-unsupported-size error):
+Fixed 7-column layout, `.xlsx` or `.csv`, up to 50 MB:
 
 | IP | Domain | Date & Time (UTC) | Request Type | Page URL | Referral URL | User Agent |
 |----|--------|-------------------|--------------|----------|--------------|------------|
 
-Each upload is given a name and becomes an independent *uploaded file* with its own SQLite
-database. Any uploaded file can be picked from the header dropdown; one is marked default.
-The 530k-row reference log parses, classifies, scores and indexes in about 35 seconds, with
-a peak of 170 MB of memory — rows stream into SQLite and the per-IP rollup runs as `GROUP BY`,
-so memory stays flat no matter how many visitors the log contains.
-
-### CRM UID → contact mapping (optional)
-
-Marketing-email links carry a `uid=` parameter identifying the recipient, so a CRM
-export turns anonymous clicks into named people — stronger identity resolution than
-reverse-IP lookup. Upload it on **Campaign Prospects**. Any `.xlsx`/`.csv` with a UID
-column plus Name (or First/Last), Email and/or Company; headers are auto-detected.
-
-Sample: **`data/samples/uid_to_contact_sample.csv`** (150 real UIDs from the reference
-log, 120 of whom reached a Contact or Demo page). Regenerate with
-`./.venv/bin/python scripts/make_sample_uid_map.py`.
-
-One caveat the UI makes explicit: a single UID often appears from many IP addresses
-because corporate mail scanners follow links automatically. The **Reach** column flags
-that, so a high click count is not mistaken for enthusiasm.
-
-### IP → domain / client mapping (optional)
-
-A ready-made test file lives at **`data/samples/ip_to_client_sample.csv`** — 60 real
-IPs from the reference log spread across all four tiers, plus 3 `/24` blocks, mapped to
-fictional companies. Upload it from any prospect page to see named accounts populate.
-Regenerate it for a different dataset with:
-
-```bash
-./.venv/bin/python scripts/make_sample_ip_map.py [dataset_id] [output.csv]
-```
-
-
-Uploadable from Industry, Product, Campaign or IP Analysis. Any `.xlsx`/`.csv` with an IP
-column plus a Company and/or Domain column — headers are auto-detected, and `10.1.2.0/24`
-blocks are expanded against the IPs actually present in the log. Once loaded, every prospect
-table resolves to named accounts and the **Named only** filter becomes useful.
+Each upload is named and becomes an independent dataset with its own database, so several
+weeks or several sites can be held side by side and compared. One is marked default.
 
 ---
 
-## Screens
-
-| Menu | What it shows |
-|------|---------------|
-| **Dashboard** | KPI strip plus a pie per prospect dimension — Industry, Product, Campaign, IP, Sources — each with a Chart/Table toggle, and daily request volume. Clicking a slice jumps to that filtered prospect list. |
-| **Industry Prospects** | Vertical share pie + ranking bar + the industry prospect table, with the IP-mapping uploader and a filterable, exportable prospect list. |
-| **Product Prospects** | Same pattern, by product/solution line. |
-| **Campaign Prospects** | Same pattern, by `utm_campaign`, plus a **Who we are targeting** table: upload a CRM export of `uid` → contact and every campaign click resolves to a named person, their company, title and email. |
-| **Recommendations** | Prioritised sales motion, then a block per tier (A-Immediate, A-High, B-Warm, C-Nurture) with its top 25 accounts, the scoring guide, and the data caveats. |
-| **ASK AI** | Ask anything about the loaded log. Claude queries the dataset and answers with prose, tables and charts. Follow-ups reuse the session. |
-| **Top Sources** | Source-class pie, top referrers bar, and the Top 500 referring hosts with prospect counts. |
-| **IP Analysis** | Eligible-IP funnel, tier/risk/source/score distributions, request-depth histogram, and the full prospect list. Any row opens that visitor's pages, timeline and user agents. |
-
----
-
-## How scoring works
-
-A per-IP **Sales Intent Score** (0–100). Positive signals are summed and capped at 100, then
-penalties are applied — so an IP that maxes out intent still falls if it looks like a crawler.
-
-| Signal | Weight |
-|---|---|
-| Demo / trial page | +45 |
-| Contact page | +35 |
-| Pricing | +20 |
-| Product / solution depth | up to +20 |
-| Industry / vertical depth | up to +12 |
-| Case study / proof content | up to +12 |
-| Marketing-email visit | +10 |
-| CRM UID present | +10 |
-| Organic search / LinkedIn referral | +5 each |
-| Repeat sessions and days | up to +16 |
-| Career-heavy traffic | −15 to −35 |
-| Investor / news-heavy traffic | −10 to −25 |
-| Support-heavy traffic | −30 |
-| Crawler risk | −10 (medium) / −35 (high) |
-
-**Tiers** — A-Immediate: ≥75 with a Contact or Demo view · A-High: ≥60 · B-Warm: 45–59 ·
-C-Nurture: <45 with at least one intent signal.
-
-An IP is **eligible** when it shows at least one intent signal and is not a declared bot.
-Crawler risk is heuristic (user agent, requests per minute, breadth of pages scanned,
-sustained request rate) — high-risk IPs stay visible but flagged and penalised.
-
-An IP is not a person. Offices, VPNs, NAT gateways, mobile carriers and cloud hosts aggregate
-many users behind one address; CRM UID is the stronger identity path when present.
-
----
-
-## Architecture
+## How it is built
 
 ```
 esp/
-  xlsxfast.py   streaming .xlsx/.csv reader (530k rows in ~14s)
-  taxonomy.py   URL → category / product / industry, referrer and bot classification
-  ingest.py     parse → classify → per-IP rollup → SQLite (one DB per uploaded file)
-  scoring.py    intent score, tiers, crawler risk
-  reports.py    every screen's data, built with SQL over the dataset DB
-  enrich.py     IP → company/domain mapping loader (exact + CIDR)
+  xlsxfast.py   streaming .xlsx/.csv reader — 530k rows in ~14s
+  taxonomy.py   URL → category / product / industry; referrer and bot classification
+  ingest.py     parse → classify → per-visitor rollup → SQLite
+  scoring.py    intent score, pipeline tiers, crawler-risk heuristics
+  reports.py    every screen's data, as SQL over the dataset
+  enrich.py     IP → company and UID → contact loaders
   askai.py      Claude session with a read-only SQL tool and chart/table emitters
-  main.py       FastAPI routes, uploads, background ingest jobs
-static/         vanilla-JS SPA (no build step) + Chart.js
+  main.py       FastAPI routes, uploads, background jobs, authentication
+static/         plain HTML/CSS/JS with Chart.js — no build step, no CDN
 ```
 
-Ask AI runs `claude-opus-5` with adaptive thinking. It gets a cached data brief plus three
-tools: `query_sql` (single read-only `SELECT`, statement-guarded, 200-row cap), `emit_chart`
-and `emit_table`. Only `SELECT`/`WITH` reach the database, over a read-only connection.
+Python + FastAPI + SQLite, one database per uploaded weblog. No database server, no compiler,
+no bundler — which is what lets it run on ordinary shared hosting.
 
-### Configuration
+The classification rules were not invented: they were derived by mining the supplied log itself,
+so the product and industry taxonomies match the pages eGain actually publishes.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | — | Enables ASK AI |
-| `ESP_MODEL` | `claude-opus-5` | Model for ASK AI |
-| `ESP_MAX_UPLOAD_MB` | `50` | Upload ceiling |
-| `ESP_HOST` / `ESP_PORT` | `127.0.0.1` / `8800` | Bind address |
+**Performance**, measured on the live host (one CPU core, 1 GB memory, throttled I/O):
+
+| | |
+|---|---|
+| Analyse 530,423 requests | **81 seconds**, 166 MB peak memory |
+| Any analysis page | under 1 second |
+| ASK AI | 17s typical, ~56s for an open-ended question |
+
+Rows stream into SQLite and the per-visitor rollup runs as `GROUP BY`, so memory stays flat
+regardless of how many visitors a log contains.
+
+---
+
+## Honest limits
+
+These are deliberate, and the interface states them where a rep will see them:
+
+- **An IP address is not a person or a company.** Offices, VPNs, NAT gateways, mobile carriers
+  and cloud hosts put many users behind one address.
+- **A campaign click is not always a human.** Corporate mail scanners follow links on the
+  recipient's behalf — one UID in this log appears from 86 different addresses. The Reach column
+  flags that rather than letting it read as enthusiasm.
+- **Crawler filtering is heuristic.** High-risk addresses stay visible but flagged and penalised,
+  with the reason shown, rather than being silently dropped.
+- **The supplied log is not a complete period.** It covers 1–25 February 2025 but contains no
+  records for 11–19 February, and the 10th and 25th are partial days. The Dashboard shows daily
+  volume so the gap is visible before the numbers are read.
+- **These are behavioural prospect pools, not qualified leads.**
+
+**Out of scope for a prototype:** CRM write-back, real-time ingestion, per-user accounts and
+roles, built-in commercial enrichment services, and multi-tenant hosting.
+
+---
+
+## Submission
+
+- **Live demo** — https://hyperanalyticslabs.com/esp/ (credentials in the submission email)
+- **Presentation** — `ESP-Design.pptx`, 5 slides
+- **Repository** — this repo

@@ -307,6 +307,22 @@ def pages(ctx=Depends(dataset_conn), limit: int = Query(200, ge=1, le=2000), cat
     return reports.pages_report(conn, limit=limit, category=category)
 
 
+@app.get("/api/{dataset_id}/accounts")
+def accounts(ctx=Depends(dataset_conn), search: Optional[str] = None,
+             limit: int = Query(200, ge=1, le=2000), offset: int = Query(0, ge=0)):
+    _, conn = ctx
+    return reports.accounts(conn, search=search, limit=limit, offset=offset)
+
+
+@app.get("/api/{dataset_id}/account/{account}")
+def account_detail(account: str, ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    detail = reports.account_detail(conn, account)
+    if not detail:
+        raise HTTPException(404, f"No account named '{account}' in this dataset.")
+    return detail
+
+
 @app.get("/api/{dataset_id}/recommendations")
 def recommendations(ctx=Depends(dataset_conn)):
     _, conn = ctx

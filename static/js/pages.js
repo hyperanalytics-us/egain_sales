@@ -10,6 +10,8 @@ const Pages = (() => {
     ref_host: 'Referrer host', unique_ips: 'Unique IPs', top_intent_pages: 'Top intent pages',
     why: 'Why sales should care', next_action: 'Next action', score_components: 'Score components',
     key: 'Name', ips: 'IPs', uids: 'CRM UIDs', identified: 'Named contacts',
+    account: 'Account', prospect_ips: 'Prospect IPs', contacts: 'Known people',
+    best_ip: 'Top address', page_views: 'Page views',
     best_tier: 'Best tier', best_score: 'Best score', reach: 'Reach',
     contact: 'Contact / Lead', contact_company: 'Contact company',
   };
@@ -137,6 +139,87 @@ const Pages = (() => {
     load();
     root.setFilter = (patch) => { Object.assign(state, patch, { offset: 0 }); load(); root.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     return root;
+  }
+
+  /* -------------------------------------------------- account detail ----- */
+  async function showAccount(name) {
+    const body = h('<div></div>');
+    body.appendChild(loading());
+    UI.modal(name, body, [], { wide: true });
+    try {
+      const d = await API.accountDetail(name);
+      const s = d.summary;
+      body.innerHTML = '';
+      body.appendChild(h(`<div class="kpis">
+        ${kpi('Best tier', s.best_tier || '—', `top score ${s.best_score}`)}
+        ${kpi('Prospect IPs', s.prospect_ips, `${num(s.ips)} mapped in total`)}
+        ${kpi('Known people', s.contacts, s.contacts ? 'from your CRM export' : 'upload a CRM export')}
+        ${kpi('Page views', s.page_views, `${num(s.sessions)} sessions`)}
+        ${kpi('Contact / Demo', `${num(s.contact_views)} / ${num(s.demo_views)}`, 'conversion page views')}
+        ${kpi('Active', s.first_seen ? s.first_seen.split(' ')[0] : '—', `through ${(s.last_seen || '').split(' ')[0]}`)}
+      </div>`));
+      if (s.domain) body.appendChild(h(`<div class="note small">Domain <b>${esc(s.domain)}</b>${
+        s.any_crawler_risk ? ' · at least one address on this account carries crawler risk — check before outreach' : ''}</div>`));
+
+      const sec = (title, cols, rows, opts) => {
+        if (!rows || !rows.length) return;
+        const c = h(`<div class="card" style="margin-bottom:16px"><h3>${esc(title)}</h3><div class="body tight"></div></div>`);
+        c.querySelector('.body').appendChild(UI.table(cols, rows, Object.assign({ headers: PROSPECT_HEADERS }, opts || {})));
+        body.appendChild(c);
+      };
+      sec('People at this account', ['contact', 'title', 'email', 'requests', 'ips', 'contact_views', 'demo_views', 'reach', 'first_seen', 'last_seen'], d.contacts);
+      sec('Addresses', ['rank', 'ip', 'tier', 'score', 'sessions', 'page_views', 'contact_views', 'demo_views', 'products', 'industries', 'crawler_risk', 'source', 'first_visit', 'last_visit'], d.ips, { onRow: (r) => showIp(r.ip) });
+      sec('Campaigns that reached them', ['campaign', 'requests', 'ips', 'uids'], d.campaigns);
+      sec('Pages viewed', ['path', 'category', 'product', 'industry', 'views', 'ips'], d.pages, { sortCol: 'views', sortDir: -1 });
+      sec('How they arrived', ['source', 'requests'], d.sources);
+    } catch (e) { body.innerHTML = ''; body.appendChild(errorBox(e)); }
+  }
+
+  /* --------------------------------------------------------- accounts ----- */
+  async function accountsPage(view) {
+    view.appendChild(loading());
+    const first = await API.accounts({ limit: 200 });
+    view.innerHTML = '';
+    view.appendChild(h(`<div class="note small">Search a target company and see everything behind it — every address,
+      every named person, the campaigns that reached them and the pages they read. Accounts are built from the
+      mappings you upload, so load an IP → client file and a CRM UID → contact file to populate this view.</div>`));
+    view.appendChild(ipMapPanel(() => App.render()));
+    view.appendChild(uidMapPanel(() => App.render()));
+
+    if (!first.total) {
+      view.appendChild(h(`<div class="empty">No named accounts yet. Upload an IP → client mapping above and
+        every address that resolves will appear here as a company.</div>`));
+      return;
+    }
+
+    const card = h(`<div class="card">
+      <h3>Accounts<span class="spacer"></span><span class="small muted" data-count></span></h3>
+      <div class="body"><div class="filters">
+        <label class="field"><span>Search company or domain</span>
+          <input type="search" data-q placeholder="e.g. Woodgrove" style="width:260px"></label>
+      </div></div>
+      <div data-rows></div>
+    </div>`);
+    view.appendChild(card);
+    const rowsPane = card.querySelector('[data-rows]');
+    let timer = null;
+
+    async function load(q) {
+      rowsPane.innerHTML = ''; rowsPane.appendChild(loading());
+      try {
+        const d = await API.accounts({ limit: 500, search: q || null });
+        rowsPane.innerHTML = '';
+        rowsPane.appendChild(UI.table(d.columns, d.rows, {
+          headers: PROSPECT_HEADERS, onRow: (r) => showAccount(r.account),
+        }));
+        card.querySelector('[data-count]').textContent =
+          `${num(d.total)} account${d.total === 1 ? '' : 's'} — click any row for the full picture`;
+      } catch (e) { rowsPane.innerHTML = ''; rowsPane.appendChild(errorBox(e)); }
+    }
+    card.querySelector('[data-q]').oninput = (e) => {
+      clearTimeout(timer); const v = e.target.value; timer = setTimeout(() => load(v), 300);
+    };
+    load(null);
   }
 
   /* ------------------------------------------- CRM UID → contact upload -- */
@@ -708,6 +791,8 @@ const Pages = (() => {
 
   return {
     dashboard,
+    accounts: accountsPage,
+    showAccount,
     industry: dimensionPage('industry'),
     product: dimensionPage('product'),
     campaign: dimensionPage('campaign'),
