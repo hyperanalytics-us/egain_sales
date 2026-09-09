@@ -9,7 +9,8 @@ from .config import TOP_PIPELINE_LIMIT, TOP_SOURCES_LIMIT
 from .scoring import TIER_ACTIONS, TIER_GUIDE, TIER_ORDER, WEIGHTS_REFERENCE
 
 PROSPECT_COLUMNS = [
-    "rank", "tier", "score", "ip", "company", "domain", "contact", "source", "uid", "campaign",
+    "rank", "tier", "score", "ip", "company", "organization", "network_type", "domain",
+    "contact", "source", "uid", "campaign",
     "first_visit", "last_visit", "active_days", "sessions", "page_views", "unique_pages",
     "contact_views", "demo_views", "product_views", "products", "industries",
     "crawler_risk", "risk_reason", "top_referrer", "top_intent_pages", "why",
@@ -33,6 +34,8 @@ def _prospect_row(r: sqlite3.Row, rank: int) -> Dict[str, Any]:
         "company": r["company"] if "company" in r.keys() and r["company"] else "",
         "domain": r["domain"] if "domain" in r.keys() and r["domain"] else "",
         "contact": (r["contact"] if "contact" in r.keys() and r["contact"] else ""),
+        "organization": (r["asn_org"] if "asn_org" in r.keys() and r["asn_org"] else ""),
+        "network_type": (r["network_type"] if "network_type" in r.keys() and r["network_type"] else ""),
         "source": r["source"],
         "uid": r["uid"] or "",
         "campaign": r["campaigns"] or "",
@@ -76,6 +79,8 @@ def prospects(
     campaign: Optional[str] = None,
     source: Optional[str] = None,
     risk: Optional[str] = None,
+    network_type: Optional[str] = None,
+    exclude_hosting: bool = False,
     min_score: Optional[int] = None,
     named_only: bool = False,
     search: Optional[str] = None,
@@ -94,6 +99,12 @@ def prospects(
     if risk:
         where.append("s.crawler_risk = ?")
         params.append(risk)
+    if network_type:
+        where.append("s.network_type = ?")
+        params.append(network_type)
+    if exclude_hosting:
+        # Cloud and hosting addresses belong to the provider, not to a buyer.
+        where.append("IFNULL(s.network_type,'') <> 'Hosting / Cloud'")
     if min_score is not None:
         where.append("s.score >= ?")
         params.append(min_score)
@@ -362,6 +373,10 @@ def ip_analysis(conn: sqlite3.Connection) -> Dict[str, Any]:
     src = conn.execute(
         "SELECT source AS key, COUNT(*) AS ips FROM ip_stats WHERE eligible = 1 GROUP BY source ORDER BY ips DESC"
     ).fetchall()
+    networks = conn.execute(
+        "SELECT IFNULL(NULLIF(network_type,''),'Unknown') AS key, COUNT(*) AS ips FROM ip_stats "
+        "WHERE eligible = 1 GROUP BY key ORDER BY ips DESC"
+    ).fetchall()
     score_hist = conn.execute(
         "SELECT (score/10)*10 AS band, COUNT(*) AS ips FROM ip_stats WHERE eligible = 1 GROUP BY band ORDER BY band"
     ).fetchall()
@@ -387,6 +402,7 @@ def ip_analysis(conn: sqlite3.Connection) -> Dict[str, Any]:
         "tiers": tier_rows,
         "risk": [dict(r) for r in risk],
         "sources": [dict(r) for r in src],
+        "networks": [dict(r) for r in networks],
         "score_histogram": [dict(r) for r in score_hist],
     }
 
@@ -636,7 +652,7 @@ def ai_context(conn: sqlite3.Connection, dataset_name: str) -> str:
 
 
 # --------------------------------------------------------------- accounts ---
-ACCOUNT_COLUMNS = ["rank", "account", "domain", "best_tier", "best_score", "prospect_ips",
+ACCOUNT_COLUMNS = ["rank", "account", "source_of_name", "domain", "best_tier", "best_score", "prospect_ips",
                    "contacts", "page_views", "sessions", "contact_views", "demo_views",
                    "products", "industries", "campaigns", "first_seen", "last_seen"]
 
@@ -717,6 +733,35 @@ def accounts(conn: sqlite3.Connection, search: Optional[str] = None,
 
     products, industries, campaigns = top_by("ip_product", "product"),         top_by("ip_industry", "industry"), top_by("ip_campaign", "campaign")
 
+    # Fill the gaps with the organization that announces each address, so the
+    # page is useful before any upload. Uploaded names always win; these are
+    # marked as inferred and never presented as verified.
+    for r in conn.execute(
+            """
+            SELECT asn_org AS account, COUNT(*) AS ips,
+                   SUM(CASE WHEN eligible = 1 THEN 1 ELSE 0 END) AS prospect_ips,
+                   SUM(page_views) AS page_views, SUM(sessions) AS sessions,
+                   SUM(contact_views) AS contact_views, SUM(demo_views) AS demo_views,
+                   MIN(NULLIF(first_ts,0)) AS first_ts, MAX(last_ts) AS last_ts,
+                   MAX(network_type) AS network_type
+            FROM ip_stats
+            WHERE IFNULL(asn_org,'') <> '' AND eligible = 1
+              -- Only networks that can plausibly *be* a company. A consumer ISP
+              -- or mobile carrier aggregates thousands of unrelated households,
+              -- and a cloud host is the provider, not the visitor.
+              AND network_type IN ('Corporate', 'Education', 'Government')
+              AND ip NOT IN (SELECT ip FROM ip_map WHERE IFNULL(company,'') <> '')
+            GROUP BY asn_org HAVING prospect_ips > 0
+            """):
+        if r["account"] not in base:
+            base[r["account"]] = dict(r, inferred=1)
+    for r in conn.execute(
+            "SELECT asn_org AS account, MAX(score) AS best_score, tier AS best_tier, ip AS best_ip "
+            "FROM ip_stats WHERE IFNULL(asn_org,'') <> '' AND eligible = 1 GROUP BY asn_org"):
+        if base.get(r["account"], {}).get("inferred"):
+            base[r["account"]].update(best_score=r["best_score"], best_tier=r["best_tier"],
+                                      best_ip=r["best_ip"])
+
     rows: List[Dict[str, Any]] = []
     for name, d in base.items():
         if like and like.strip("%").lower() not in name.lower() and            like.strip("%").lower() not in str(d.get("domain", "")).lower():
@@ -739,6 +784,7 @@ def accounts(conn: sqlite3.Connection, search: Optional[str] = None,
             "campaigns": campaigns.get(name, ""),
             "first_seen": _iso(d.get("first_ts")),
             "last_seen": _iso(d.get("last_ts")),
+            "source_of_name": "Inferred from network" if d.get("inferred") else "Uploaded mapping",
         })
 
     rows.sort(key=lambda r: (-(r["best_score"] or 0), -(r["demo_views"] or 0), r["account"]))
@@ -763,6 +809,13 @@ def account_detail(conn: sqlite3.Connection, account: str) -> Dict[str, Any]:
     """Everything known about one company, gathered in one place."""
     ips = [dict(r) for r in conn.execute(
         f"{_BASE_SELECT} WHERE m.company = ? ORDER BY s.score DESC, s.page_views DESC", (account,))]
+    inferred = False
+    if not ips:
+        # No uploaded mapping under this name - try the announcing organization.
+        ips = [dict(r) for r in conn.execute(
+            f"{_BASE_SELECT} WHERE s.asn_org = ? AND s.eligible = 1 "
+            f"ORDER BY s.score DESC, s.page_views DESC LIMIT 500", (account,))]
+        inferred = bool(ips)
     if not ips:
         exists = conn.execute("SELECT 1 FROM uid_map WHERE company = ? LIMIT 1", (account,)).fetchone()
         if not exists:
@@ -822,6 +875,8 @@ def account_detail(conn: sqlite3.Connection, account: str) -> Dict[str, Any]:
         "last_seen": _iso(max((r["last_ts"] for r in ips), default=0)),
         "domain": next((r["domain"] for r in ips if r["domain"]), ""),
         "any_crawler_risk": any(r["crawler_risk"] != "Low" for r in ips),
+        "network_type": next((r["network_type"] for r in ips if r["network_type"]), ""),
+        "name_source": "Inferred from the announcing network" if inferred else "Uploaded mapping",
     }
     return {"account": account, "summary": agg, "ips": prospect_rows,
             "contacts": contacts, "pages": pages, "campaigns": campaigns_seen, "sources": sources}

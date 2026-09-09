@@ -11,13 +11,14 @@ const Pages = (() => {
     why: 'Why sales should care', next_action: 'Next action', score_components: 'Score components',
     key: 'Name', ips: 'IPs', uids: 'CRM UIDs', identified: 'Named contacts',
     account: 'Account', prospect_ips: 'Prospect IPs', contacts: 'Known people',
+    organization: 'Organization (network)', network_type: 'Network', source_of_name: 'Name from',
     best_ip: 'Top address', page_views: 'Page views',
     best_tier: 'Best tier', best_score: 'Best score', reach: 'Reach',
     contact: 'Contact / Lead', contact_company: 'Contact company',
   };
 
   const DEFAULT_PROSPECT_COLS = [
-    'rank', 'tier', 'score', 'ip', 'company', 'contact', 'domain', 'source', 'uid', 'campaign',
+    'rank', 'tier', 'score', 'ip', 'company', 'organization', 'network_type', 'contact', 'source', 'uid', 'campaign',
     'products', 'industries', 'demo_views', 'contact_views', 'page_views', 'sessions',
     'active_days', 'first_visit', 'last_visit', 'crawler_risk', 'why', 'next_action',
   ];
@@ -48,6 +49,7 @@ const Pages = (() => {
         ${kpi('Contact / Demo', `${num(r.contact_views)} / ${num(r.demo_views)}`, 'conversion page views')}
         ${kpi('Crawler risk', r.crawler_risk, r.risk_reason || 'no automation signals')}
         ${kpi('Source', r.source, r.top_referrer || 'no referrer recorded')}
+        ${kpi('Network', r.network_type || 'Unresolved', r.asn_org ? `${r.asn_org} (AS${r.asn})` : 'no routing data')}
       </div>`));
       body.appendChild(h(`<div class="card" style="margin-bottom:16px"><div class="body">
         <div class="defs">
@@ -101,6 +103,9 @@ const Pages = (() => {
     if (!opts.hideTier) filters.appendChild(mk('Tier', sel('tier', [['', 'All tiers'], ['A - Immediate', 'A - Immediate'], ['A - High', 'A - High'], ['B - Warm', 'B - Warm'], ['C - Nurture', 'C - Nurture']], state.tier || '')));
     filters.appendChild(mk('Source', sel('source', [['', 'All sources'], ['Email / Marketing', 'Email / Marketing'], ['Organic Search', 'Organic Search'], ['LinkedIn', 'LinkedIn'], ['AI Assistant', 'AI Assistant'], ['Social', 'Social'], ['Other Referral', 'Other Referral'], ['Internal (egain.com)', 'Internal'], ['Direct / Unknown', 'Direct / Unknown']], state.source || '')));
     filters.appendChild(mk('Crawler risk', sel('risk', [['', 'Any'], ['Low', 'Low only'], ['Medium', 'Medium'], ['High', 'High']], state.risk || '')));
+    filters.appendChild(mk('Network', sel('network_type', [['', 'All networks'], ['__nohost', 'Exclude hosting / cloud'],
+      ['Corporate', 'Corporate only'], ['Consumer ISP', 'Consumer ISP'], ['Mobile carrier', 'Mobile carrier'],
+      ['Education', 'Education'], ['Government', 'Government'], ['Hosting / Cloud', 'Hosting / cloud only']], state.network_type || '')));
     filters.appendChild(mk('Min score', h(`<input type="number" data-f="min_score" min="0" max="100" step="5" style="width:92px" value="${state.min_score || ''}">`)));
     filters.appendChild(mk('Rows', sel('limit', [['50', '50'], ['100', '100'], ['250', '250'], ['500', '500'], ['1000', '1000']], String(state.limit))));
     filters.appendChild(mk('Search', h(`<input type="search" data-f="search" placeholder="IP, company, product…" style="width:200px" value="${esc(state.search || '')}">`)));
@@ -112,6 +117,10 @@ const Pages = (() => {
       const f = e.target.dataset.f; if (!f) return;
       state[f] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
       if (f === 'limit') state.limit = +e.target.value;
+      if (f === 'network_type') {           // one control, two query shapes
+        state.exclude_hosting = e.target.value === '__nohost';
+        state.network_type = e.target.value === '__nohost' ? null : e.target.value;
+      }
       state.offset = 0;
       clearTimeout(timer); timer = setTimeout(load, e.target.type === 'search' ? 320 : 0);
     });
@@ -182,7 +191,9 @@ const Pages = (() => {
     view.innerHTML = '';
     view.appendChild(h(`<div class="note small">Search a target company and see everything behind it — every address,
       every named person, the campaigns that reached them and the pages they read. Accounts are built from the
-      mappings you upload, so load an IP → client file and a CRM UID → contact file to populate this view.</div>`));
+      mappings you upload. Without one, ESP falls back to the organization that announces each address on the
+      internet — useful on a first run, but the <b>Name from</b> column says which you are looking at, and an
+      announcing network is only the company when that company runs its own.</div>`));
     view.appendChild(ipMapPanel(() => App.render()));
     view.appendChild(uidMapPanel(() => App.render()));
 
@@ -616,6 +627,10 @@ const Pages = (() => {
     grid.appendChild(UI.chartTableCard({ title: 'All IPs by crawler risk',
       slices: a.risk.map((r) => ({ label: r.key, value: r.ips })), columns: ['key', 'ips'], rows: a.risk,
       headers: PROSPECT_HEADERS }));
+    grid.appendChild(UI.chartTableCard({ title: 'Prospect IPs by network type',
+      slices: (a.networks || []).map((r) => ({ label: r.key, value: r.ips })), columns: ['key', 'ips'],
+      rows: a.networks || [], headers: PROSPECT_HEADERS,
+      note: 'Cloud and hosting addresses belong to the provider, not to a buyer — filter them out of the list below.' }));
     grid.appendChild(UI.chartTableCard({ title: 'Prospect IPs by traffic source',
       slices: a.sources.map((r) => ({ label: r.key, value: r.ips })), columns: ['key', 'ips'], rows: a.sources,
       headers: PROSPECT_HEADERS }));

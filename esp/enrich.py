@@ -12,6 +12,7 @@ import re
 import sqlite3
 from typing import Dict, List, Optional, Tuple
 
+from . import asn as asn_lookup
 from .xlsxfast import iter_rows
 
 _IP_HEADERS = ("ip", "ip address", "ipaddress", "ip_address", "client ip", "address", "cidr", "network", "ip range", "ip_range")
@@ -274,3 +275,31 @@ def load_uid_map(conn: sqlite3.Connection, path: str, replace: bool = False) -> 
             "title": header[title_col] if title_col is not None else None,
         },
     }
+
+
+def backfill_asn(conn: sqlite3.Connection, batch: int = 5000) -> Dict[str, object]:
+    """Resolve every address to its announcing network.
+
+    Gives a rep an organization name without any upload at all, and — more
+    usefully — separates the addresses that belong to a company from the ones
+    that belong to a cloud provider. Roughly two thirds of the visitors in a
+    typical log are hosting infrastructure, and chasing those is wasted effort.
+    """
+    if not asn_lookup.available():
+        return {"available": False, "reason": "run scripts/fetch_asn.py to build the lookup"}
+
+    ips = [r[0] for r in conn.execute("SELECT ip FROM ip_stats")]
+    resolved = asn_lookup.lookup_many(ips)
+    rows = [(v[0], v[1], v[3], ip) for ip, v in resolved.items()]
+    for i in range(0, len(rows), batch):
+        conn.executemany(
+            "UPDATE ip_stats SET asn = ?, asn_org = ?, network_type = ? WHERE ip = ?",
+            rows[i:i + batch])
+    conn.execute(
+        "UPDATE ip_stats SET network_type = ? WHERE network_type IS NULL OR network_type = ''",
+        (asn_lookup.NET_UNKNOWN,))
+    conn.commit()
+
+    mix = {r["network_type"]: r["n"] for r in conn.execute(
+        "SELECT network_type, COUNT(*) AS n FROM ip_stats GROUP BY network_type")}
+    return {"available": True, "addresses": len(ips), "resolved": len(resolved), "mix": mix}

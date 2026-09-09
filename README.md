@@ -46,6 +46,8 @@ every attribute that helps answer it:
 | **Marketing campaign** | Campaign Prospects, filterable per campaign |
 | **IP address** | IP Analysis, with full per-visitor history |
 | **Traffic source** | Top Sources, plus a filter on every prospect table |
+| **Network type** | Filter on every prospect table — exclude hosting in one click |
+| **Organization** | Resolved automatically from the routing table, shown on every row |
 | **Pipeline tier / intent score** | Filter on every prospect table |
 | **Crawler risk** | Filter on every prospect table |
 | **CRM UID** | Free-text search |
@@ -98,10 +100,36 @@ black box.
 ## Turning addresses into names
 
 An IP address is not a company and a click is not a person, so ESP does not pretend otherwise.
-It resolves identity from two files the sales team supplies — both optional, both uploaded in
-the browser, both with auto-detected column headers.
+It resolves identity three ways — one automatic, two from files the sales team supplies.
 
-**1. IP → client** *(any prospect page)*
+**0. Automatic — the announcing network** *(no upload needed)*
+Every address is resolved offline against the global BGP routing table, giving an organization
+name and, more usefully, a **network type**. This is what separates a real company from
+infrastructure:
+
+| Network type | Share of visitors | What it means for a rep |
+|---|---|---|
+| Hosting / Cloud | **56%** | The address belongs to AWS, Google, Contabo… — the provider, not a buyer |
+| Consumer ISP | 15% | Comcast, AT&T, a corporate security proxy — many unrelated users |
+| Corporate | 18% | A company running its own network — the callable ones |
+| Mobile / Education / Government | 1% | |
+
+Filtering hosting out of the prospect list takes it from 24,044 addresses to **10,550**, and
+A-Immediate from 297 to 121. That one filter is the difference between a list and a call sheet.
+
+Build or refresh the lookup (free, public domain, no API key, ~27 MB):
+
+```bash
+./.venv/bin/python scripts/fetch_asn.py
+```
+
+**The limit, stated plainly:** an ASN is the network that *announces* an address, which equals
+the company only when that company runs its own network. Names like `BCBSMA` resolve to a real
+prospect; names like `QUICKPACKET` are transit providers. ESP labels every account with where its
+name came from — **Uploaded mapping** or **Inferred from network** — and never presents the
+second as verified. The two uploads below are how you get certainty.
+
+**1. IP → client** *(any prospect page)* — *authoritative, overrides the automatic lookup*
 A reverse-IP or ABM export. Exact addresses and CIDR blocks both work. Once loaded, company and
 domain appear in every table, the Accounts page populates, and a named-accounts filter becomes
 available.
@@ -183,7 +211,8 @@ esp/
   ingest.py     parse → classify → per-visitor rollup → SQLite
   scoring.py    intent score, pipeline tiers, crawler-risk heuristics
   reports.py    every screen's data, as SQL over the dataset
-  enrich.py     IP → company and UID → contact loaders
+  asn.py        offline IP → organization and network-type lookup
+  enrich.py     IP → company, UID → contact, and network backfill
   askai.py      Claude session with a read-only SQL tool and chart/table emitters
   main.py       FastAPI routes, uploads, background jobs, authentication
 static/         plain HTML/CSS/JS with Chart.js — no build step, no CDN

@@ -91,7 +91,10 @@ CREATE TABLE IF NOT EXISTS ip_stats (
     tier                  TEXT,
     eligible              INTEGER,
     why                   TEXT,
-    next_action           TEXT
+    next_action           TEXT,
+    asn                   INTEGER,
+    asn_org               TEXT,
+    network_type          TEXT
 );
 
 CREATE TABLE IF NOT EXISTS ip_product  (ip TEXT, product  TEXT, views INTEGER);
@@ -165,6 +168,7 @@ CREATE INDEX IF NOT EXISTS idx_req_industry ON requests(industry);
 CREATE INDEX IF NOT EXISTS idx_req_uid      ON requests(uid);
 CREATE INDEX IF NOT EXISTS idx_ipstats_score ON ip_stats(score DESC);
 CREATE INDEX IF NOT EXISTS idx_ipstats_tier  ON ip_stats(tier);
+CREATE INDEX IF NOT EXISTS idx_ipstats_net   ON ip_stats(network_type);
 CREATE INDEX IF NOT EXISTS idx_ipprod       ON ip_product(product);
 CREATE INDEX IF NOT EXISTS idx_ipind        ON ip_industry(industry);
 CREATE INDEX IF NOT EXISTS idx_ipcamp       ON ip_campaign(campaign);
@@ -226,6 +230,13 @@ UPDATE campaigns SET uids = (
 """
 
 
+# Columns added after the first release. SQLite has no ADD COLUMN IF NOT EXISTS,
+# so these are checked against the table before being applied.
+ADDED_COLUMNS = {
+    "ip_stats": [("asn", "INTEGER"), ("asn_org", "TEXT"), ("network_type", "TEXT")],
+}
+
+
 def migrate(dataset_id: str) -> None:
     """Bring an already-ingested dataset up to the current schema.
 
@@ -234,6 +245,11 @@ def migrate(dataset_id: str) -> None:
     """
     conn = connect(dataset_id)
     try:
+        for table, cols in ADDED_COLUMNS.items():
+            have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+            for name, decl in cols:
+                if name not in have:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
         conn.executescript(MIGRATIONS)
         conn.commit()
     finally:

@@ -13,3 +13,5 @@ venv/
 
 # Build artifact for File Manager uploads
 esp-deploy.zip
+# Built by scripts/fetch_asn.py — 27 MB, regenerate rather than commit
+data/asn.db

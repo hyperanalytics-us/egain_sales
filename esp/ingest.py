@@ -439,10 +439,12 @@ def ingest_file(
             s["source"], s["score"], s["score_components"], s["tier"], s["eligible"], s["why"], s["next_action"],
         ))
         if len(ip_rows) >= INSERT_BATCH:
-            write.executemany("INSERT OR REPLACE INTO ip_stats VALUES(" + ",".join(["?"] * 43) + ")", ip_rows)
+            write.executemany("INSERT OR REPLACE INTO ip_stats(ip, first_ts, last_ts, active_days, sessions, page_views, unique_pages, contact_views, demo_views, pricing_views, product_views, industry_views, proof_views, blog_views, career_views, investor_views, support_views, marketing_email_views, organic_ref_views, linkedin_ref_views, ai_ref_views, external_ref_views, max_req_per_min, is_bot_ua, bot_name, crawler_risk, risk_reason, career_share, investor_share, support_share, products, industries, campaigns, uid, top_referrer, top_intent_pages, source, score, score_components, tier, eligible, why, next_action) VALUES("
+                          + ",".join(["?"] * 43) + ")", ip_rows)
             ip_rows.clear()
     if ip_rows:
-        write.executemany("INSERT OR REPLACE INTO ip_stats VALUES(" + ",".join(["?"] * 43) + ")", ip_rows)
+        write.executemany("INSERT OR REPLACE INTO ip_stats(ip, first_ts, last_ts, active_days, sessions, page_views, unique_pages, contact_views, demo_views, pricing_views, product_views, industry_views, proof_views, blog_views, career_views, investor_views, support_views, marketing_email_views, organic_ref_views, linkedin_ref_views, ai_ref_views, external_ref_views, max_req_per_min, is_bot_ua, bot_name, crawler_risk, risk_reason, career_share, investor_share, support_share, products, industries, campaigns, uid, top_referrer, top_intent_pages, source, score, score_components, tier, eligible, why, next_action) VALUES("
+                          + ",".join(["?"] * 43) + ")", ip_rows)
         ip_rows.clear()
     read.close()
     write.close()
@@ -471,6 +473,10 @@ def ingest_file(
       FROM requests WHERE IFNULL(campaign, '') <> '' GROUP BY campaign;
 
     """)
+
+    note("Resolving organizations...", 90.0)
+    from .enrich import backfill_asn
+    asn_stats = backfill_asn(conn)
 
     note("Summarising...", 93.0)
     unique_pages = conn.execute("SELECT COUNT(*) AS n FROM page_stats").fetchone()["n"]
@@ -502,6 +508,7 @@ def ingest_file(
         "day_histogram": day_hist,
         "ingested_at": int(time.time()),
         "ingest_seconds": round(time.time() - t0, 1),
+        "asn": asn_stats,
     }
     db.set_meta(conn, meta_values)
 

@@ -249,6 +249,8 @@ def prospects(
     campaign: Optional[str] = None,
     source: Optional[str] = None,
     risk: Optional[str] = None,
+    network_type: Optional[str] = None,
+    exclude_hosting: bool = False,
     min_score: Optional[int] = None,
     named_only: bool = False,
     search: Optional[str] = None,
@@ -257,7 +259,8 @@ def prospects(
     _, conn = ctx
     return reports.prospects(
         conn, limit=limit, offset=offset, tier=tier, product=product, industry=industry,
-        campaign=campaign, source=source, risk=risk, min_score=min_score, named_only=named_only,
+        campaign=campaign, source=source, risk=risk, network_type=network_type,
+        exclude_hosting=exclude_hosting, min_score=min_score, named_only=named_only,
         search=search, include_ineligible=include_ineligible,
     )
 
@@ -305,6 +308,16 @@ def ip_detail(ip: str, ctx=Depends(dataset_conn)):
 def pages(ctx=Depends(dataset_conn), limit: int = Query(200, ge=1, le=2000), category: Optional[str] = None):
     _, conn = ctx
     return reports.pages_report(conn, limit=limit, category=category)
+
+
+@app.get("/api/{dataset_id}/asn-status")
+def asn_status(ctx=Depends(dataset_conn)):
+    from . import asn as asn_lookup
+    _, conn = ctx
+    mix = {r["k"]: r["n"] for r in conn.execute(
+        "SELECT IFNULL(NULLIF(network_type,''),'Unresolved') AS k, COUNT(*) AS n "
+        "FROM ip_stats WHERE eligible = 1 GROUP BY k")}
+    return {**asn_lookup.stats(), "mix": mix}
 
 
 @app.get("/api/{dataset_id}/accounts")
