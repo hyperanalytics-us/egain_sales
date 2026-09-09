@@ -60,6 +60,29 @@ _set_job = jobs.set_job
 _get_job = jobs.get_job
 
 
+_migrated: set = set()
+_migrate_lock = threading.Lock()
+
+
+def _ensure_migrated(dataset_id: str) -> None:
+    """Bring a dataset's schema up to date, once per worker process.
+
+    This deliberately does not use an ASGI startup event: under Passenger the app
+    is served through a WSGI bridge that never runs the lifespan protocol, so
+    startup handlers are silently skipped in production.
+    """
+    if dataset_id in _migrated:
+        return
+    with _migrate_lock:
+        if dataset_id in _migrated:
+            return
+        try:
+            db.migrate(dataset_id)
+        except Exception as exc:  # noqa: BLE001 - a stale dataset must not break the request
+            print(f"migration skipped for {dataset_id}: {exc}")
+        _migrated.add(dataset_id)
+
+
 def _resolve_dataset(dataset_id: str) -> Dict[str, Any]:
     if dataset_id in ("default", "current", ""):
         cat = db.list_datasets()
@@ -71,6 +94,7 @@ def _resolve_dataset(dataset_id: str) -> Dict[str, Any]:
         raise HTTPException(404, f"Unknown dataset '{dataset_id}'.")
     if entry.get("status") != "ready":
         raise HTTPException(409, f"Dataset '{entry.get('name')}' is still {entry.get('status')}.")
+    _ensure_migrated(entry["id"])
     return entry
 
 
@@ -387,7 +411,6 @@ def uid_map_status(ctx=Depends(dataset_conn)):
 @app.post("/api/{dataset_id}/uid-map")
 def upload_uid_map(dataset_id: str, file: UploadFile = File(...), replace: bool = Form(False)):
     entry = _resolve_dataset(dataset_id)
-    db.migrate(entry["id"])
     path = _save_upload(file, "uidmap")
     conn = db.connect(entry["id"])
     try:
@@ -568,18 +591,6 @@ def favicon():
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "datasets": len(db.list_datasets()["datasets"]), "ai_enabled": askai.available(), "auth_required": auth.enabled()}
-
-
-@app.on_event("startup")
-def _migrate_datasets() -> None:
-    """Apply additive schema changes to datasets ingested by an older build."""
-    for entry in db.list_datasets()["datasets"]:
-        if entry.get("status") != "ready":
-            continue
-        try:
-            db.migrate(entry["id"])
-        except Exception as exc:  # noqa: BLE001 - a bad dataset must not stop startup
-            print(f"migration skipped for {entry['id']}: {exc}")
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
