@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP — eGain Sales Prospects</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230b57d0'/><text x='16' y='23' font-size='17' font-family='Helvetica' font-weight='bold' fill='white' text-anchor='middle'>E</text></svg>">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div id="app">
+  <aside>
+    <div class="brand">
+      <div class="logo"><i></i> ESP</div>
+      <div class="sub">eGain Sales Prospects</div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <div id="ds-foot">No weblog loaded</div>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <h1 id="page-title">Dashboard</h1>
+      <div class="spacer"></div>
+      <label class="field">
+        <span>Uploaded file</span>
+        <select id="ds-select"></select>
+      </label>
+      <button class="btn" id="btn-manage" title="Manage uploaded files">Manage</button>
+      <button class="btn primary" id="btn-upload">Upload weblog</button>
+    </header>
+    <div class="content" id="view"><div class="empty"><span class="spinner"></span> Loading…</div></div>
+  </main>
+</div>
+<div id="overlay-root"></div>
+<script src="/static/vendor/chart.umd.js"></script>
+<script src="/static/js/ui.js"></script>
+<script src="/static/js/api.js"></script>
+<script src="/static/js/pages.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,403 @@
+"""ESP - eGain Sales Prospects.  FastAPI backend + static single-page UI."""
+from __future__ import annotations
+
+import csv
+import io
+import os
+import shutil
+import threading
+import time
+import traceback
+import uuid
+from typing import Any, Dict, Optional
+
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+
+from . import askai, db, enrich, ingest, reports
+from .config import MAX_UPLOAD_BYTES, MAX_UPLOAD_MB, STATIC_DIR, UPLOAD_DIR
+
+app = FastAPI(title="eGain Sales Prospects (ESP)", version="1.0.0")
+
+ALLOWED_EXT = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".log"}
+_jobs: Dict[str, Dict[str, Any]] = {}
+_jobs_lock = threading.Lock()
+
+
+# ------------------------------------------------------------------ helpers --
+def _set_job(job_id: str, **fields: Any) -> None:
+    with _jobs_lock:
+        _jobs.setdefault(job_id, {}).update(fields)
+
+
+def _get_job(job_id: str) -> Optional[Dict[str, Any]]:
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        return dict(job) if job else None
+
+
+def _resolve_dataset(dataset_id: str) -> Dict[str, Any]:
+    if dataset_id in ("default", "current", ""):
+        cat = db.list_datasets()
+        if not cat.get("default_id"):
+            raise HTTPException(404, "No weblog has been uploaded yet.")
+        dataset_id = cat["default_id"]
+    entry = db.get_dataset(dataset_id)
+    if not entry:
+        raise HTTPException(404, f"Unknown dataset '{dataset_id}'.")
+    if entry.get("status") != "ready":
+        raise HTTPException(409, f"Dataset '{entry.get('name')}' is still {entry.get('status')}.")
+    return entry
+
+
+def dataset_conn(dataset_id: str):
+    entry = _resolve_dataset(dataset_id)
+    conn = db.connect(entry["id"], readonly=True)
+    try:
+        yield entry, conn
+    finally:
+        conn.close()
+
+
+def _save_upload(upload: UploadFile, prefix: str) -> str:
+    ext = os.path.splitext(upload.filename or "")[1].lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(
+            415,
+            f"Unsupported file type '{ext or 'unknown'}'. Upload an .xlsx, .xlsm, .csv, .tsv, .txt or .log file.",
+        )
+    dest = UPLOAD_DIR / f"{prefix}_{uuid.uuid4().hex[:8]}{ext}"
+    size = 0
+    try:
+        with open(dest, "wb") as out:
+            while True:
+                chunk = upload.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    out.close()
+                    dest.unlink(missing_ok=True)
+                    raise HTTPException(
+                        413,
+                        f"Unsupported file size. The uploaded file exceeds the {MAX_UPLOAD_MB} MB limit.",
+                    )
+                out.write(chunk)
+    finally:
+        upload.file.close()
+    if size == 0:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, "The uploaded file is empty.")
+    return str(dest)
+
+
+# ------------------------------------------------------------------ uploads --
+def _run_ingest(job_id: str, dataset_id: str, path: str, name: str, filename: str, make_default: bool) -> None:
+    def progress(msg: str, pct: float) -> None:
+        _set_job(job_id, message=msg, percent=round(pct, 1))
+
+    try:
+        meta = ingest.ingest_file(path, dataset_id, name, filename, progress)
+        db.upsert_dataset(
+            {
+                "id": dataset_id,
+                "name": name,
+                "original_filename": filename,
+                "file_size": meta["file_size"],
+                "total_requests": meta["total_requests"],
+                "unique_ips": meta["unique_ips"],
+                "eligible_ips": meta["eligible_ips"],
+                "coverage_start": meta["coverage_start"],
+                "coverage_end": meta["coverage_end"],
+                "created_at": meta["ingested_at"],
+                "status": "ready",
+            },
+            make_default=make_default,
+        )
+        _set_job(job_id, status="done", percent=100.0, message="Analysis complete",
+                 dataset_id=dataset_id, meta=meta)
+    except Exception as exc:  # noqa: BLE001 - surfaced to the user
+        traceback.print_exc()
+        db.delete_dataset(dataset_id)
+        _set_job(job_id, status="error", message=str(exc) or exc.__class__.__name__)
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+@app.post("/api/datasets/upload")
+def upload_dataset(
+    file: UploadFile = File(...),
+    name: str = Form(""),
+    make_default: bool = Form(True),
+):
+    path = _save_upload(file, "weblog")
+    dataset_id = db.new_dataset_id()
+    label = (name or "").strip() or os.path.splitext(file.filename or "Weblog")[0]
+    job_id = uuid.uuid4().hex[:12]
+    _set_job(job_id, status="running", percent=0.0, message="Queued", dataset_id=dataset_id, name=label)
+    db.upsert_dataset(
+        {"id": dataset_id, "name": label, "original_filename": file.filename,
+         "file_size": os.path.getsize(path), "created_at": int(time.time()), "status": "processing"},
+        make_default=False,
+    )
+    threading.Thread(
+        target=_run_ingest,
+        args=(job_id, dataset_id, path, label, file.filename or "upload", bool(make_default)),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "dataset_id": dataset_id, "name": label}
+
+
+@app.get("/api/jobs/{job_id}")
+def job_status(job_id: str):
+    job = _get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Unknown job.")
+    return job
+
+
+# ----------------------------------------------------------------- datasets --
+@app.get("/api/datasets")
+def datasets():
+    cat = db.list_datasets()
+    return {"datasets": cat["datasets"], "default_id": cat.get("default_id"),
+            "max_upload_mb": MAX_UPLOAD_MB, "ai_enabled": askai.available()}
+
+
+@app.post("/api/datasets/{dataset_id}/default")
+def make_default(dataset_id: str):
+    _resolve_dataset(dataset_id)
+    db.set_default_dataset(dataset_id)
+    return {"ok": True, "default_id": dataset_id}
+
+
+@app.delete("/api/datasets/{dataset_id}")
+def remove_dataset(dataset_id: str):
+    if not db.get_dataset(dataset_id):
+        raise HTTPException(404, "Unknown dataset.")
+    db.delete_dataset(dataset_id)
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ reports --
+@app.get("/api/{dataset_id}/dashboard")
+def dashboard(ctx=Depends(dataset_conn)):
+    entry, conn = ctx
+    return {"dataset": entry, **reports.dashboard(conn)}
+
+
+@app.get("/api/{dataset_id}/prospects")
+def prospects(
+    ctx=Depends(dataset_conn),
+    limit: int = Query(100, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+    tier: Optional[str] = None,
+    product: Optional[str] = None,
+    industry: Optional[str] = None,
+    campaign: Optional[str] = None,
+    source: Optional[str] = None,
+    risk: Optional[str] = None,
+    min_score: Optional[int] = None,
+    named_only: bool = False,
+    search: Optional[str] = None,
+    include_ineligible: bool = False,
+):
+    _, conn = ctx
+    return reports.prospects(
+        conn, limit=limit, offset=offset, tier=tier, product=product, industry=industry,
+        campaign=campaign, source=source, risk=risk, min_score=min_score, named_only=named_only,
+        search=search, include_ineligible=include_ineligible,
+    )
+
+
+@app.get("/api/{dataset_id}/industries")
+def industries(ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    return reports.industry_report(conn)
+
+
+@app.get("/api/{dataset_id}/products")
+def products(ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    return reports.product_report(conn)
+
+
+@app.get("/api/{dataset_id}/campaigns")
+def campaigns(ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    return reports.campaign_report(conn)
+
+
+@app.get("/api/{dataset_id}/sources")
+def sources(ctx=Depends(dataset_conn), limit: int = Query(500, ge=1, le=5000)):
+    _, conn = ctx
+    return reports.sources_report(conn, limit=limit)
+
+
+@app.get("/api/{dataset_id}/ip-analysis")
+def ip_analysis(ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    return reports.ip_analysis(conn)
+
+
+@app.get("/api/{dataset_id}/ip/{ip}")
+def ip_detail(ip: str, ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    detail = reports.ip_detail(conn, ip)
+    if not detail:
+        raise HTTPException(404, f"IP {ip} is not in this dataset.")
+    return detail
+
+
+@app.get("/api/{dataset_id}/pages")
+def pages(ctx=Depends(dataset_conn), limit: int = Query(200, ge=1, le=2000), category: Optional[str] = None):
+    _, conn = ctx
+    return reports.pages_report(conn, limit=limit, category=category)
+
+
+@app.get("/api/{dataset_id}/recommendations")
+def recommendations(ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    return reports.recommendations(conn)
+
+
+@app.get("/api/{dataset_id}/export/prospects.csv")
+def export_prospects(
+    ctx=Depends(dataset_conn),
+    limit: int = Query(500, ge=1, le=100000),
+    tier: Optional[str] = None,
+    product: Optional[str] = None,
+    industry: Optional[str] = None,
+    campaign: Optional[str] = None,
+    source: Optional[str] = None,
+    risk: Optional[str] = None,
+    min_score: Optional[int] = None,
+    named_only: bool = False,
+    search: Optional[str] = None,
+):
+    entry, conn = ctx
+    data = reports.prospects(conn, limit=limit, tier=tier, product=product, industry=industry,
+                             campaign=campaign, source=source, risk=risk, min_score=min_score,
+                             named_only=named_only, search=search)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=data["columns"], extrasaction="ignore")
+    writer.writeheader()
+    for row in data["rows"]:
+        writer.writerow(row)
+    buf.seek(0)
+    fname = f"esp_prospects_{entry['id']}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+# --------------------------------------------------------------- enrichment --
+@app.get("/api/{dataset_id}/ip-map")
+def ip_map_status(ctx=Depends(dataset_conn)):
+    _, conn = ctx
+    total = conn.execute("SELECT COUNT(*) AS n FROM ip_map").fetchone()["n"]
+    matched = conn.execute("SELECT COUNT(*) AS n FROM ip_map m JOIN ip_stats s ON s.ip = m.ip").fetchone()["n"]
+    matched_prospects = conn.execute(
+        "SELECT COUNT(*) AS n FROM ip_map m JOIN ip_stats s ON s.ip = m.ip WHERE s.eligible = 1"
+    ).fetchone()["n"]
+    sample = [dict(r) for r in conn.execute(
+        "SELECT m.ip, m.company, m.domain, s.score, s.tier FROM ip_map m JOIN ip_stats s ON s.ip = m.ip "
+        "WHERE s.eligible = 1 ORDER BY s.score DESC LIMIT 10")]
+    return {"mapping_size": total, "matched_ips": matched, "matched_prospects": matched_prospects,
+            "sample": sample}
+
+
+@app.post("/api/{dataset_id}/ip-map")
+def upload_ip_map(dataset_id: str, file: UploadFile = File(...), replace: bool = Form(False)):
+    entry = _resolve_dataset(dataset_id)
+    path = _save_upload(file, "ipmap")
+    conn = db.connect(entry["id"])
+    try:
+        result = enrich.load_ip_map(conn, path, replace=bool(replace))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return result
+
+
+@app.delete("/api/{dataset_id}/ip-map")
+def clear_ip_map(dataset_id: str):
+    entry = _resolve_dataset(dataset_id)
+    conn = db.connect(entry["id"])
+    try:
+        conn.execute("DELETE FROM ip_map")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------- ask ai --
+@app.post("/api/{dataset_id}/ask")
+async def ask(dataset_id: str, request: Request):
+    entry = _resolve_dataset(dataset_id)
+    body = await request.json()
+    question = (body.get("question") or "").strip()
+    if not question:
+        raise HTTPException(400, "Ask a question first.")
+    session_id = (body.get("session_id") or "default").strip()[:64]
+    try:
+        return askai.ask(question, entry["id"], entry.get("name", entry["id"]), session_id)
+    except askai.AskAIError as exc:
+        raise HTTPException(503, str(exc))
+
+
+@app.post("/api/{dataset_id}/ask/reset")
+def ask_reset(dataset_id: str, session_id: str = Form("default")):
+    entry = _resolve_dataset(dataset_id)
+    askai.reset_session(session_id, entry["id"])
+    return {"ok": True}
+
+
+@app.get("/api/ask/status")
+def ask_status():
+    return {"enabled": askai.available(), "suggestions": askai.SUGGESTIONS}
+
+
+# -------------------------------------------------------------------- shell --
+@app.exception_handler(HTTPException)
+async def http_error(_: Request, exc: HTTPException):
+    return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+
+
+@app.get("/")
+def index():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+FAVICON = (
+    b"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+    b"<rect width='32' height='32' rx='8' fill='#0b57d0'/>"
+    b"<text x='16' y='23' font-size='17' font-family='Helvetica' font-weight='bold' "
+    b"fill='white' text-anchor='middle'>E</text></svg>"
+)
+
+
+@app.get("/favicon.ico")
+def favicon():
+    from fastapi.responses import Response
+    return Response(FAVICON, media_type="image/svg+xml")
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True, "datasets": len(db.list_datasets()["datasets"]), "ai_enabled": askai.available()}
+
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

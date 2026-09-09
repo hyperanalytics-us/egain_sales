@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "esp",
+      "runtimeExecutable": "./.venv/bin/python",
+      "runtimeArgs": ["-m", "uvicorn", "esp.main:app", "--host", "127.0.0.1", "--port", "8800"],
+      "port": 8800
+    }
+  ]
+}
