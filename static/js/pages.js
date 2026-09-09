@@ -473,7 +473,10 @@ const Pages = (() => {
         <div class="av">${role === 'user' ? 'You' : 'AI'}</div><div class="bubble"></div></div>`);
       const b = el.querySelector('.bubble');
       if (role === 'user') { b.textContent = payload; return el; }
-      if (payload.pending) { b.innerHTML = '<span class="spinner"></span> Querying the dataset…'; return el; }
+      if (payload.pending) {
+        b.innerHTML = '<span class="spinner"></span> <span data-tick>Querying the dataset…</span>';
+        return el;
+      }
       if (payload.error) { b.innerHTML = `<div class="note err" style="margin:0">${esc(payload.error)}</div>`; return el; }
 
       b.innerHTML = UI.markdown(payload.answer);
@@ -517,7 +520,10 @@ const Pages = (() => {
       chat.appendChild(pending);
       pending.scrollIntoView({ behavior: 'smooth', block: 'end' });
       try {
-        const r = await API.ask(q, sid);
+        const tick = pending.querySelector('[data-tick]');
+        const r = await API.ask(q, sid, (secs) => {
+          if (tick) tick.textContent = `Querying the dataset… ${secs}s`;
+        });
         const payload = { answer: r.answer, charts: r.charts, tables: r.tables, queries: r.queries };
         App.aiHistory.push({ role: 'ai', payload });
         pending.replaceWith(bubble('ai', payload));

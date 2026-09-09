@@ -368,18 +368,43 @@ def clear_ip_map(dataset_id: str):
 
 
 # ------------------------------------------------------------------- ask ai --
+def _run_ask(job_id: str, question: str, dataset_id: str, dataset_name: str, session_id: str) -> None:
+    try:
+        _set_job(job_id, status="done", result=askai.ask(question, dataset_id, dataset_name, session_id))
+    except askai.AskAIError as exc:
+        _set_job(job_id, status="error", message=str(exc))
+    except Exception as exc:  # noqa: BLE001 - surfaced to the user
+        traceback.print_exc()
+        _set_job(job_id, status="error", message=str(exc) or exc.__class__.__name__)
+
+
 @app.post("/api/{dataset_id}/ask")
 async def ask(dataset_id: str, request: Request):
+    """Start an Ask AI turn and return a job to poll.
+
+    A question with several queries behind it can take minutes. Holding the HTTP
+    connection open that long fails behind CDNs and proxies - Cloudflare's free
+    tier cuts an origin request off at 100 seconds with a 524 - so the work runs
+    in a thread and the browser polls, exactly as weblog ingestion does.
+    """
     entry = _resolve_dataset(dataset_id)
     body = await request.json()
     question = (body.get("question") or "").strip()
     if not question:
         raise HTTPException(400, "Ask a question first.")
+    if not askai.available():
+        raise HTTPException(503, "Ask AI is not configured. Set ANTHROPIC_API_KEY and restart ESP.")
     session_id = (body.get("session_id") or "default").strip()[:64]
-    try:
-        return askai.ask(question, entry["id"], entry.get("name", entry["id"]), session_id)
-    except askai.AskAIError as exc:
-        raise HTTPException(503, str(exc))
+
+    job_id = uuid.uuid4().hex[:12]
+    jobs.purge_old()
+    _set_job(job_id, status="running", message="Querying the dataset...", dataset_id=entry["id"])
+    threading.Thread(
+        target=_run_ask,
+        args=(job_id, question, entry["id"], entry.get("name", entry["id"]), session_id),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id}
 
 
 @app.post("/api/{dataset_id}/ask/reset")
@@ -447,7 +472,13 @@ def index(request: Request):
     base = (ROOT_PATH or request.scope.get("root_path", "")).rstrip("/") + "/"
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     html = html.replace("__ESP_BASE__", base).replace("__ESP_V__", _asset_version())
-    return HTMLResponse(html)
+    # The shell carries the versioned asset URLs, so it must never be cached
+    # itself - otherwise a stale shell keeps requesting the old JavaScript and
+    # the cache buster silently does nothing.
+    return HTMLResponse(html, headers={
+        "Cache-Control": "no-store, must-revalidate",
+        "Pragma": "no-cache",
+    })
 
 
 def _asset_version() -> str:

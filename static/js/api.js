@@ -46,7 +46,22 @@ const API = {
   recommendations()     { return this.d('/recommendations'); },
   ipMapStatus()         { return this.d('/ip-map'); },
   clearIpMap()          { return this.del(`/api/${this.ds}/ip-map`); },
-  ask(question, sid)    { return this.post(`/api/${this.ds}/ask`, { question, session_id: sid }); },
+  askStart(question, sid) { return this.post(`/api/${this.ds}/ask`, { question, session_id: sid }); },
+
+  /* Ask AI runs as a background job so no single request stays open for minutes
+     - long requests are cut off by CDNs and proxies (Cloudflare returns 524). */
+  async ask(question, sid, onTick) {
+    const { job_id } = await this.askStart(question, sid);
+    const started = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const job = await this.job(job_id);
+      if (job.status === 'done') return job.result;
+      if (job.status === 'error') throw new Error(job.message || 'Ask AI failed.');
+      if (onTick) onTick(Math.round((Date.now() - started) / 1000));
+      if (Date.now() - started > 10 * 60 * 1000) throw new Error('Timed out after 10 minutes.');
+    }
+  },
   exportUrl(p) {
     const qs = new URLSearchParams(Object.entries(p || {}).filter(([, v]) => v !== null && v !== undefined && v !== '' && v !== false));
     return url(`/api/${this.ds}/export/prospects.csv?${qs}`);

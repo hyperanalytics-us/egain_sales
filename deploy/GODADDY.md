@@ -1,4 +1,4 @@
-# Deploying ESP on GoDaddy cPanel → javasri.com/esp
+# Deploying ESP on GoDaddy cPanel → hyperanalyticslabs.com/esp
 
 GoDaddy Linux Hosting with cPanel includes **Setup Python App**, which runs
 Phusion Passenger. ESP ships a `passenger_wsgi.py` for exactly this, so no code
@@ -40,7 +40,7 @@ cPanel → **Software → Setup Python App → Create Application**:
 |---|---|
 | Python version | **3.9 or newer** (pick the highest offered) |
 | Application root | `esp` |
-| Application URL | `javasri.com` + `/esp` |
+| Application URL | `hyperanalyticslabs.com` + `/esp` |
 | Application startup file | `passenger_wsgi.py` |
 | Application Entry point | `application` |
 
@@ -58,6 +58,28 @@ Two things that trip people up:
 
 Click **Create**, then **Stop** the app while you upload files.
 
+## Where the code goes — not in public_html
+
+A natural assumption is that the code belongs in
+`public_html/hyperanalyticslabs.com/esp`, because that is the URL. It does not.
+
+cPanel splits the two:
+
+- **Application root** (`~/esp`) holds the code, the virtualenv link, and `data/`
+  with the uploaded weblogs and analysed databases. It lives in your home
+  directory, **outside any web root**, so none of it is fetchable over HTTP.
+- **`public_html/hyperanalyticslabs.com/esp/`** gets a small `.htaccess` that
+  cPanel writes for you, handing requests to Passenger. That is all that belongs
+  there.
+
+The URL is still `hyperanalyticslabs.com/esp` either way. Putting the code in the
+document root instead would expose `data/` (every prospect record you have
+uploaded), `.env`, and the session signing key to anyone who guesses a filename.
+
+If you have a reason to keep the application root inside `public_html`,
+`deploy/deploy.sh` detects it and appends the deny rules from
+`deploy/htaccess-app-root.conf` — but outside the web root is the better answer.
+
 ## 2. Upload ESP
 
 Everything except the local working directories. Via SSH (Deluxe and above):
@@ -66,6 +88,17 @@ Everything except the local working directories. Via SSH (Deluxe and above):
 cd ~/esp
 git clone https://github.com/<you>/egain-sales-prospects.git .
 ```
+
+The scripted route does all of steps 2–5 in one command:
+
+```bash
+./deploy/deploy.sh <cpanel-user>@<ssh-host> esp https://hyperanalyticslabs.com/esp/
+```
+
+It syncs the code (never `data/`, `.env` or `.venv`), installs into the cPanel
+virtualenv, hardens the directory if needed, restarts Passenger and smoke-tests
+`/healthz`. It authenticates by SSH key only — import your public key under
+**cPanel → SSH Access → Manage SSH Keys** and *authorize* it first.
 
 Or, without SSH: on your Mac run
 
@@ -121,7 +154,7 @@ Environment variables only take effect after a restart, so click **Restart** now
 
 ## 5. Check it
 
-Open **https://javasri.com/esp/** — with the trailing slash. You should get the
+Open **https://hyperanalyticslabs.com/esp/** — with the trailing slash. You should get the
 sign-in box. After signing in the Dashboard will say no weblog is loaded.
 
 Then **Upload weblog**, choose your `Website visitor IP address log file 1.xlsx`,
@@ -131,12 +164,27 @@ seconds rather than the 28 seconds it takes locally.
 Quick health check without signing in:
 
 ```
-https://javasri.com/esp/healthz
+https://hyperanalyticslabs.com/esp/healthz
 ```
 
 Should return `{"ok":true,...,"auth_required":true}`.
 
 ---
+
+## Cloudflare sits in front of this domain
+
+`hyperanalyticslabs.com` resolves to Cloudflare, which proxies to GoDaddy. Two
+consequences ESP already handles:
+
+- **Cloudflare cuts off any origin request that takes over 100 seconds** (error
+  524). Both slow operations therefore run as background jobs the browser polls:
+  weblog ingestion, and ASK AI. No single request stays open, so a question that
+  takes three minutes still returns normally.
+- **Uploads pass through Cloudflare's request-size limit** (100 MB on free
+  plans). ESP caps weblogs at 50 MB, so this never bites.
+
+If you later see a 524 anyway, it is something new holding a request open — not
+ingestion or ASK AI.
 
 ## Limits to watch on GoDaddy shared hosting
 
