@@ -40,7 +40,9 @@ unsupported-size error):
 
 Each upload is given a name and becomes an independent *uploaded file* with its own SQLite
 database. Any uploaded file can be picked from the header dropdown; one is marked default.
-The 530k-row reference log parses, classifies, scores and indexes in about 30 seconds.
+The 530k-row reference log parses, classifies, scores and indexes in about 35 seconds, with
+a peak of 170 MB of memory — rows stream into SQLite and the per-IP rollup runs as `GROUP BY`,
+so memory stays flat no matter how many visitors the log contains.
 
 ### IP → domain / client mapping (optional)
 

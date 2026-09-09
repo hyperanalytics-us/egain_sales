@@ -6,7 +6,29 @@ changes are needed.
 
 **Before you start:** sign in to cPanel and confirm **Software → Setup Python App**
 exists. If it is missing, your plan cannot run ESP — see `../DEPLOY.md` for the
-alternatives. (It is present on Deluxe / Ultimate / Maximum; Economy varies.)
+alternatives.
+
+## Does Deluxe have the headroom? Yes.
+
+GoDaddy's published limits for the Deluxe plan, against what ESP actually uses:
+
+| Resource | Deluxe allows | ESP needs | Verdict |
+|---|---|---|---|
+| Memory | 1 GB | **170 MB** peak, during ingest only | Comfortable |
+| CPU | 1 core | ~35 s of CPU per uploaded weblog | Fine — it is a one-off, not per request |
+| Disk | 50 GB | **172 MB** per analysed weblog | Room for ~100 weblogs |
+| Entry processes | 30 | 1–2 | Fine |
+| NProcs | 45 | a handful | Fine |
+| Inodes (files) | 250,000 | ~20,000, nearly all in the virtualenv | Fine |
+| I/O | 10 MB/s | ~300 MB per ingest | **This is the slow part** |
+
+The I/O throttle, not memory or CPU, is what you will notice: a 530k-row weblog
+that ingests in 35 seconds locally will take roughly **2–5 minutes** on Deluxe.
+The progress bar keeps the browser and the Passenger process alive throughout,
+so let it run. Everything after ingest is served from SQLite indexes and is fast.
+
+If you ever do hit the memory cap on a much larger log, lower the SQLite page
+cache with the `ESP_SQLITE_CACHE_MB` environment variable (default 16).
 
 ---
 
@@ -120,7 +142,8 @@ Should return `{"ok":true,...,"auth_required":true}`.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Upload dies partway with no error | Account memory cap. Ingest peaks around **433 MB** | Check cPanel → Resource Usage right after it fails. If memory is the limiter, the plan cannot ingest a log this large — move to a VPS |
+| Upload dies partway with no error | Account memory cap (Deluxe: 1 GB shared with everything else on the account) | Check cPanel → Resource Usage right after it fails. Lower `ESP_SQLITE_CACHE_MB` to 4 and retry |
+| Ingest takes several minutes | Deluxe I/O throttle of 10 MB/s, ~300 MB written per weblog | Expected. Leave the tab open; the progress bar is live |
 | "Request Entity Too Large" | Apache `LimitRequestBody` | Ask GoDaddy support to raise it for the account, or split the log |
 | ASK AI errors, everything else fine | Outbound HTTPS blocked | Ask support to allow `api.anthropic.com`. Only ASK AI is affected |
 | First request after idle is slow | Passenger stopped an idle process | Normal. It respawns in a few seconds |

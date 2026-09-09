@@ -7,10 +7,11 @@ Measured on the 530k-row reference weblog, not estimated:
 | Requirement | Measured | Notes |
 |---|---|---|
 | Runtime | Python 3.9+ | Or PHP 8 after the port described below |
-| Peak memory during ingest | **433 MB** | The one number that rules hosts out |
-| Ingest CPU time | ~28 s | Runs once per uploaded weblog, not per request |
+| Peak memory during ingest | **170 MB** | Was 433 MB before the rollup moved into SQL |
+| Ingest CPU time | ~35 s | Runs once per uploaded weblog, not per request |
 | Steady-state memory | ~90 MB | Serving pages is cheap; SQLite does the work |
-| Disk per weblog | **171 MB** | Plus the 22 MB upload while it is being processed |
+| Disk per weblog | **172 MB** | Plus the 22 MB upload while it is being processed |
+| Disk I/O per weblog | ~300 MB | The real bottleneck on throttled shared hosting |
 | Upload size | up to 50 MB | Needs `upload_max_filesize`/proxy limits raised |
 | Outbound HTTPS | to `api.anthropic.com` | ASK AI only; everything else works without it |
 | Long-running process | Preferred, not required | Passenger keeps one alive on cPanel |
@@ -35,7 +36,7 @@ Hosting — only the plan names differ.
 Two things to verify first:
 
 - **Memory.** CloudLinux caps shared accounts (commonly 1 GB, sometimes 512 MB).
-  Ingest peaks at 433 MB. Under a 512 MB cap the first big upload will be killed.
+  Ingest peaks at 170 MB, so even a 512 MB cap has room.
 - **Outbound HTTPS.** Some shared hosts block it, which disables ASK AI only.
 
 If there is no *Setup Python App*, this plan cannot run ESP as it stands. The
@@ -70,9 +71,9 @@ Two things must change shape, because shared PHP is more constrained:
 1. **Ingest becomes resumable.** PHP's `max_execution_time` is often 30 s, so the
    upload is processed in chunks across several requests, resuming from a stored
    row offset. The UI already polls a job endpoint, so this is invisible to users.
-2. **The per-IP rollup moves into SQL.** Python holds 91k aggregates in memory
-   (the 433 MB peak). In PHP the rows stream straight into SQLite and the rollup
-   runs as `GROUP BY`, which keeps PHP memory near flat and fits a 256 MB limit.
+2. **The per-IP rollup is already SQL.** This was the hard part and it is done:
+   `ingest.py` streams rows into SQLite and rolls up with `GROUP BY`, so the PHP
+   port is a transcription of the same queries rather than a redesign.
 
 That is a backend rewrite of roughly `ingest`, `reports`, `askai`, `enrich` and
 `main`. The taxonomy rules, scoring weights and the entire UI carry over.
@@ -91,6 +92,7 @@ Set these in `.env` (or cPanel → Environment Variables):
 | `ESP_ROOT_PATH` | `/esp` when behind a reverse proxy. Passenger sets this itself |
 | `ANTHROPIC_API_KEY` | Enables ASK AI |
 | `ESP_MAX_UPLOAD_MB` | Upload ceiling, default 50 |
+| `ESP_SQLITE_CACHE_MB` | SQLite page cache, default 16. Lower it on a very tight memory cap |
 
 ### Sub-path mounting
 
