@@ -370,7 +370,9 @@ def clear_ip_map(dataset_id: str):
 # ------------------------------------------------------------------- ask ai --
 def _run_ask(job_id: str, question: str, dataset_id: str, dataset_name: str, session_id: str) -> None:
     try:
-        _set_job(job_id, status="done", result=askai.ask(question, dataset_id, dataset_name, session_id))
+        result = askai.ask(question, dataset_id, dataset_name, session_id,
+                           on_progress=lambda msg: _set_job(job_id, message=msg))
+        _set_job(job_id, status="done", result=result)
     except askai.AskAIError as exc:
         _set_job(job_id, status="error", message=str(exc))
     except Exception as exc:  # noqa: BLE001 - surfaced to the user

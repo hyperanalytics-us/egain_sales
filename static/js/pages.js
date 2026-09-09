@@ -521,8 +521,8 @@ const Pages = (() => {
       pending.scrollIntoView({ behavior: 'smooth', block: 'end' });
       try {
         const tick = pending.querySelector('[data-tick]');
-        const r = await API.ask(q, sid, (secs) => {
-          if (tick) tick.textContent = `Querying the dataset… ${secs}s`;
+        const r = await API.ask(q, sid, (secs, msg) => {
+          if (tick) tick.textContent = `${msg || 'Querying the dataset…'} (${secs}s)`;
         });
         const payload = { answer: r.answer, charts: r.charts, tables: r.tables, queries: r.queries };
         App.aiHistory.push({ role: 'ai', payload });

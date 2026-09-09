@@ -58,7 +58,7 @@ const API = {
       const job = await this.job(job_id);
       if (job.status === 'done') return job.result;
       if (job.status === 'error') throw new Error(job.message || 'Ask AI failed.');
-      if (onTick) onTick(Math.round((Date.now() - started) / 1000));
+      if (onTick) onTick(Math.round((Date.now() - started) / 1000), job.message);
       if (Date.now() - started > 10 * 60 * 1000) throw new Error('Timed out after 10 minutes.');
     }
   },

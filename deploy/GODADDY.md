@@ -188,6 +188,26 @@ ANTHROPIC_API_KEY=<your key, enables ASK AI>
 
 `chmod 600 ~/esp/.env`, then `touch ~/esp/tmp/restart.txt` to apply.
 
+## ASK AI latency
+
+Measured on this server. Latency is dominated by **how many query rounds** the
+model takes, not by SQL (the whole report query suite runs in under a second) and
+not by network (a Claude round trip is ~2.5 s from here).
+
+| Question | Before | After |
+|---|---|---|
+| "How many A-Immediate prospects?" | 23.8 s | 17.1 s |
+| "Which 10 accounts should I call first?" | **177.9 s** (15 queries) | **56.5 s** (5 queries) |
+
+Two changes did it: the system prompt now tells the model to issue independent
+queries together in one turn instead of one at a time, and reasoning effort
+defaults to `medium` (lower effort consolidates tool calls). The UI also shows
+what it is doing — "Query 3: ranking industries" — rather than a bare counter.
+
+Set `ESP_AI_EFFORT` in `~/esp/.env` to trade speed against depth:
+`low` is fastest, `medium` is the default, `high` and `xhigh` reason harder and
+take longer. Restart with `touch ~/esp/tmp/restart.txt` after changing it.
+
 ## Cloudflare sits in front of this domain
 
 `hyperanalyticslabs.com` resolves to Cloudflare, which proxies to GoDaddy. Two

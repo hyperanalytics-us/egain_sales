@@ -17,6 +17,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import db
 from .config import ANTHROPIC_API_KEY, DATA_DIR, MODEL
+
+# Reasoning effort for Ask AI. Lower effort consolidates tool calls, which is
+# what keeps question latency down - each extra round is a separate API call.
+EFFORT = os.environ.get("ESP_AI_EFFORT", "medium")
 from .reports import ai_context
 
 MAX_ROWS = 200
@@ -102,7 +106,13 @@ SYSTEM_PROMPT = """You are the analyst inside ESP (eGain Sales Prospects), a web
 eGain sales reps.
 
 Answer questions about the loaded website-visitor log using the query_sql tool. Do not guess numbers -
-query for them. Run as many queries as you need before answering.
+query for them.
+
+Query in parallel. Every round trip costs the rep several seconds of waiting, so issue all the
+queries you already know you need as multiple query_sql calls in the SAME turn, rather than one at a
+time. Only run a follow-up round when the next query genuinely depends on what the last one returned.
+Three well-chosen queries in one turn beat ten sequential ones; aim to answer within two or three
+rounds.
 
 Rules:
 - Always restrict prospect questions to ip_stats.eligible = 1 unless the user explicitly asks about raw
@@ -251,7 +261,8 @@ def reset_session(session_id: str, dataset_id: str) -> None:
             pass
 
 
-def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "default") -> Dict[str, Any]:
+def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "default",
+        on_progress: Optional[Any] = None) -> Dict[str, Any]:
     if not available():
         raise AskAIError(
             "Ask AI is not configured. Add ANTHROPIC_API_KEY to the .env file next to run.sh and restart ESP."
@@ -280,7 +291,15 @@ def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "de
     answer_parts: List[str] = []
     usage = {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}
 
-    for _ in range(MAX_TOOL_ROUNDS):
+    def note(text: str) -> None:
+        if on_progress:
+            try:
+                on_progress(text)
+            except Exception:
+                pass
+
+    for round_no in range(1, MAX_TOOL_ROUNDS + 1):
+        note(f"Thinking (step {round_no})..." if round_no > 1 else "Reading the dataset...")
         try:
             response = client.messages.create(
                 model=MODEL,
@@ -289,6 +308,7 @@ def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "de
                 tools=TOOLS,
                 messages=messages,
                 thinking={"type": "adaptive"},
+                output_config={"effort": EFFORT},
             )
         except anthropic.AuthenticationError as exc:
             raise AskAIError("ANTHROPIC_API_KEY was rejected. Check the key in .env.") from exc
@@ -323,6 +343,7 @@ def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "de
             payload = block.input if isinstance(block.input, dict) else json.loads(block.input)
             if block.name == "query_sql":
                 sql = payload.get("sql", "")
+                note(f"Query {len(queries) + 1}: {payload.get('purpose') or 'running'}")
                 try:
                     result = run_sql(dataset_id, sql)
                     queries.append({"sql": sql, "purpose": payload.get("purpose", ""),
@@ -334,6 +355,7 @@ def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "de
                     results.append({"type": "tool_result", "tool_use_id": block.id,
                                     "content": f"Query failed: {exc}", "is_error": True})
             elif block.name == "emit_chart":
+                note(f"Building chart: {payload.get('title', '')[:60]}")
                 charts.append(payload)
                 results.append({"type": "tool_result", "tool_use_id": block.id, "content": "chart rendered"})
             elif block.name == "emit_table":
@@ -346,6 +368,7 @@ def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "de
     else:
         answer_parts.append("\n\n_(Stopped after the maximum number of query rounds.)_")
 
+    note("Writing the answer...")
     answer = "\n\n".join(p.strip() for p in answer_parts if p.strip()) or \
              "I could not produce an answer for that question."
 
