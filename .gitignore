@@ -7,3 +7,6 @@ data/
 .venv/
 venv/
 .DS_Store
+
+# Build artifact for File Manager uploads
+esp-deploy.zip
