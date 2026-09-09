@@ -25,8 +25,12 @@ browser before committing. Delete it afterwards.
 ### Exact Hosting (formerly OneWorldHosting) — your current cPanel plan
 
 Works **if** cPanel shows **Software → Setup Python App**. That runs Phusion
-Passenger, which speaks WSGI, so `deploy/passenger_wsgi.py` bridges ESP's ASGI
-app with `a2wsgi`. Follow the instructions in that file.
+Passenger, which speaks WSGI, so the `passenger_wsgi.py` in the repository root
+bridges ESP's ASGI app with `a2wsgi`.
+
+**GoDaddy cPanel: step-by-step instructions are in [deploy/GODADDY.md](deploy/GODADDY.md).**
+The same steps apply to any cPanel host with Setup Python App, including Exact
+Hosting — only the plan names differ.
 
 Two things to verify first:
 

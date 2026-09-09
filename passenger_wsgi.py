@@ -1,10 +1,10 @@
 """Entry point for cPanel "Setup Python App" (Phusion Passenger).
 
 Passenger speaks WSGI and ESP is an ASGI app, so a2wsgi bridges the two.
-Copy this file to the application root that cPanel creates, alongside the
-`esp/` package and `static/` directory.
+This file must sit in the application root, beside the `esp/` package - which
+is where it already lives in this repository.
 
-cPanel setup:
+cPanel setup (GoDaddy and most cPanel hosts):
   1. Software > Setup Python App > Create Application
        Python version    3.9 or newer
        Application root  esp            (a folder in your home dir, not public_html)
@@ -14,6 +14,7 @@ cPanel setup:
   2. Upload the repository into that application root.
   3. "Enter to the virtual environment" (cPanel shows the exact command),
      then:  pip install -r deploy/requirements-passenger.txt
+     (or set that path as the app's "Configuration file" and click Run Pip Install)
   4. Add ANTHROPIC_API_KEY and ESP_PASSWORD in the app's Environment Variables.
   5. Restart the application.
 

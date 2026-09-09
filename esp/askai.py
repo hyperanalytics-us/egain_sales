@@ -6,7 +6,9 @@ state is kept per session so follow-up questions reuse the same context.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import sqlite3
 import threading
@@ -14,7 +16,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import db
-from .config import ANTHROPIC_API_KEY, MODEL
+from .config import ANTHROPIC_API_KEY, DATA_DIR, MODEL
 from .reports import ai_context
 
 MAX_ROWS = 200
@@ -22,8 +24,42 @@ MAX_TOOL_ROUNDS = 12
 MAX_HISTORY_TURNS = 12
 SESSION_TTL_SECONDS = 6 * 3600
 
-_sessions: Dict[str, Dict[str, Any]] = {}
+# Chat state is stored on disk rather than in this process: Passenger and other
+# multi-worker servers spread a conversation's turns across processes, and an
+# in-memory dict would silently drop the history on every other question.
+SESSION_DIR = DATA_DIR / "sessions"
+SESSION_DIR.mkdir(parents=True, exist_ok=True)
+
 _lock = threading.Lock()
+
+
+def _session_path(dataset_id: str, session_id: str):
+    key = hashlib.sha256(f"{dataset_id}::{session_id}".encode()).hexdigest()[:32]
+    return SESSION_DIR / f"{key}.json"
+
+
+def _read_session(path) -> Optional[Dict[str, Any]]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _write_session(path, data: Dict[str, Any]) -> None:
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    os.replace(tmp, path)
+
+
+def _prune_session_files() -> None:
+    cutoff = time.time() - SESSION_TTL_SECONDS
+    for path in SESSION_DIR.glob("*.json"):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except OSError:
+            pass
 
 _FORBIDDEN = re.compile(
     r"\b(insert|update|delete|drop|alter|create|replace|attach|detach|pragma|vacuum|reindex|truncate|begin|commit)\b",
@@ -186,18 +222,12 @@ def run_sql(dataset_id: str, sql: str) -> Dict[str, Any]:
         conn.close()
 
 
-def _prune_sessions() -> None:
-    cutoff = time.time() - SESSION_TTL_SECONDS
-    for key in [k for k, v in _sessions.items() if v["updated"] < cutoff]:
-        _sessions.pop(key, None)
-
-
 def _session(session_id: str, dataset_id: str, dataset_name: str) -> Dict[str, Any]:
-    key = f"{dataset_id}::{session_id}"
+    path = _session_path(dataset_id, session_id)
     with _lock:
-        _prune_sessions()
-        sess = _sessions.get(key)
-        if sess is None or sess["dataset_id"] != dataset_id:
+        _prune_session_files()
+        sess = _read_session(path)
+        if sess is None or sess.get("dataset_id") != dataset_id:
             conn = db.connect(dataset_id, readonly=True)
             try:
                 brief = ai_context(conn, dataset_name)
@@ -209,13 +239,16 @@ def _session(session_id: str, dataset_id: str, dataset_name: str) -> Dict[str, A
                 "messages": [],
                 "updated": time.time(),
             }
-            _sessions[key] = sess
+            _write_session(path, sess)
         return sess
 
 
 def reset_session(session_id: str, dataset_id: str) -> None:
     with _lock:
-        _sessions.pop(f"{dataset_id}::{session_id}", None)
+        try:
+            _session_path(dataset_id, session_id).unlink()
+        except OSError:
+            pass
 
 
 def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "default") -> Dict[str, Any]:
@@ -326,6 +359,7 @@ def ask(question: str, dataset_id: str, dataset_name: str, session_id: str = "de
         ]
         sess["messages"] = history[-(MAX_HISTORY_TURNS * 2):]
         sess["updated"] = time.time()
+        _write_session(_session_path(dataset_id, session_id), sess)
 
     return {
         "answer": answer,

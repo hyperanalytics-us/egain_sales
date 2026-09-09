@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request,
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import askai, auth, db, enrich, ingest, reports
+from . import askai, auth, db, enrich, ingest, jobs, reports
 from .config import MAX_UPLOAD_BYTES, MAX_UPLOAD_MB, STATIC_DIR, UPLOAD_DIR
 
 # ESP is commonly mounted under a sub-path (e.g. https://example.com/esp).
@@ -42,20 +42,9 @@ async def require_login(request: Request, call_next):
     return await call_next(request)
 
 ALLOWED_EXT = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".log"}
-_jobs: Dict[str, Dict[str, Any]] = {}
-_jobs_lock = threading.Lock()
-
-
-# ------------------------------------------------------------------ helpers --
-def _set_job(job_id: str, **fields: Any) -> None:
-    with _jobs_lock:
-        _jobs.setdefault(job_id, {}).update(fields)
-
-
-def _get_job(job_id: str) -> Optional[Dict[str, Any]]:
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-        return dict(job) if job else None
+# Job state lives on disk, not in this process - see esp/jobs.py.
+_set_job = jobs.set_job
+_get_job = jobs.get_job
 
 
 def _resolve_dataset(dataset_id: str) -> Dict[str, Any]:
@@ -159,6 +148,7 @@ def upload_dataset(
     dataset_id = db.new_dataset_id()
     label = (name or "").strip() or os.path.splitext(file.filename or "Weblog")[0]
     job_id = uuid.uuid4().hex[:12]
+    jobs.purge_old()
     _set_job(job_id, status="running", percent=0.0, message="Queued", dataset_id=dataset_id, name=label)
     db.upsert_dataset(
         {"id": dataset_id, "name": label, "original_filename": file.filename,
