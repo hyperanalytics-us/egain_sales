@@ -1,0 +1,64 @@
+IP Address,Company Name,Domain,Industry,Country,Employees
+3.238.110.97,Wide World Importers,wideworldimporters.example,Technology & IT,United States,50-200
+3.235.41.234,Graphic Design Systems,graphicdesignsys.example,Technology & IT,United Kingdom,"200-1,000"
+140.89.104.2,Woodgrove Bank,woodgrovebank.example,Banking,Germany,"1,000-5,000"
+193.186.4.139,Lucerne Publishing,lucernepublishing.example,Unknown,Canada,"5,000-20,000"
+173.239.214.183,Blue Yonder Health Plan,blueyonderhealth.example,Health Insurance,India,"20,000+"
+173.239.214.210,Coho Benefits,cohobenefits.example,Health Insurance,Netherlands,50-200
+193.186.4.226,Litware Savings,litwaresavings.example,Banking,Australia,"200-1,000"
+167.86.98.51,School of Fine Art,schooloffineart.example,Unknown,United States,"1,000-5,000"
+16.98.8.208,Humongous Media,humongousmedia.example,Unknown,United Kingdom,"5,000-20,000"
+152.58.17.128,Fourth Coffee Group,fourthcoffeegroup.example,Unknown,Germany,"20,000+"
+204.236.191.44,City of Fourth Coffee,fourthcoffee.example,Government,Canada,50-200
+47.206.174.94,Lucerne Publishing 2,lucernepublishing2.example,Unknown,India,"200-1,000"
+63.98.148.55,Trey Capital Partners,treycapital.example,Financial Services,Netherlands,"1,000-5,000"
+38.154.47.229,Woodgrove Bank 2,woodgrovebank2.example,Banking,Australia,"5,000-20,000"
+75.51.42.97,School of Fine Art 2,schooloffineart2.example,Unknown,United States,"20,000+"
+216.118.190.9,Humongous Media 2,humongousmedia2.example,Unknown,United Kingdom,50-200
+69.55.5.249,Fourth Coffee Group 2,fourthcoffeegroup2.example,Unknown,Germany,"200-1,000"
+52.32.240.62,Litware Savings 2,litwaresavings2.example,Banking,Canada,"1,000-5,000"
+35.224.190.59,Nod Regional Authority,nodauthority.example,Government,India,"5,000-20,000"
+195.238.127.70,Lucerne Publishing 3,lucernepublishing3.example,Unknown,Netherlands,"20,000+"
+98.42.217.207,School of Fine Art 3,schooloffineart3.example,Unknown,Australia,50-200
+98.45.68.218,Humongous Media 3,humongousmedia3.example,Unknown,United States,"200-1,000"
+12.51.197.162,Fourth Coffee Group 3,fourthcoffeegroup3.example,Unknown,United Kingdom,"1,000-5,000"
+74.208.38.236,Woodgrove Bank 3,woodgrovebank3.example,Banking,Germany,"5,000-20,000"
+74.125.215.40,Litware Savings 3,litwaresavings3.example,Banking,Canada,"20,000+"
+44.202.17.232,Wide World Importers 2,wideworldimporters2.example,Technology & IT,India,50-200
+3.93.80.78,Graphic Design Systems 2,graphicdesignsys2.example,Technology & IT,Netherlands,"200-1,000"
+94.130.55.32,Wide World Importers 3,wideworldimporters3.example,Technology & IT,Australia,"1,000-5,000"
+3.228.240.204,Lucerne Publishing 4,lucernepublishing4.example,Unknown,United States,"5,000-20,000"
+74.91.59.98,Proseware Retail,prosewareretail.example,Retail & eCommerce,United Kingdom,"20,000+"
+37.44.202.18,School of Fine Art 4,schooloffineart4.example,Unknown,Germany,50-200
+89.46.159.225,Humongous Media 4,humongousmedia4.example,Unknown,Canada,"200-1,000"
+145.239.113.73,Fourth Coffee Group 4,fourthcoffeegroup4.example,Unknown,India,"1,000-5,000"
+38.132.121.120,Lucerne Publishing 5,lucernepublishing5.example,Unknown,Netherlands,"5,000-20,000"
+212.103.49.221,School of Fine Art 5,schooloffineart5.example,Unknown,Australia,"20,000+"
+72.14.201.149,Graphic Design Systems 3,graphicdesignsys3.example,Technology & IT,United States,50-200
+72.14.201.225,Northwind Financial,northwindfinancial.example,Financial Services,United Kingdom,"200-1,000"
+81.133.253.97,Humongous Media 5,humongousmedia5.example,Unknown,Germany,"1,000-5,000"
+38.154.62.118,Fourth Coffee Group 5,fourthcoffeegroup5.example,Unknown,Canada,"5,000-20,000"
+149.22.88.71,Lucerne Publishing 6,lucernepublishing6.example,Unknown,India,"20,000+"
+136.226.67.91,Fabrikam Manufacturing,fabrikam.example,Manufacturing,Netherlands,50-200
+45.146.204.232,School of Fine Art 6,schooloffineart6.example,Unknown,Australia,"200-1,000"
+89.38.155.82,Humongous Media 6,humongousmedia6.example,Unknown,United States,"1,000-5,000"
+194.76.34.199,Adventure Utilities,adventureutilities.example,Utilities,United Kingdom,"5,000-20,000"
+37.120.150.228,Fourth Coffee Group 6,fourthcoffeegroup6.example,Unknown,Germany,"20,000+"
+208.56.29.104,Lucerne Publishing 7,lucernepublishing7.example,Unknown,Canada,50-200
+23.105.149.213,School of Fine Art 7,schooloffineart7.example,Unknown,India,"200-1,000"
+155.254.26.44,Humongous Media 7,humongousmedia7.example,Unknown,Netherlands,"1,000-5,000"
+185.225.31.30,Fourth Coffee Group 7,fourthcoffeegroup7.example,Unknown,Australia,"5,000-20,000"
+192.95.21.31,Lucerne Publishing 8,lucernepublishing8.example,Unknown,United States,"20,000+"
+44.211.126.2,Wide World Importers 4,wideworldimporters4.example,Technology & IT,United Kingdom,50-200
+3.233.239.206,Southridge Stores,southridgestores.example,Retail & eCommerce,Germany,"200-1,000"
+107.21.74.164,The Phone Company,thephonecompany.example,Telecom,Canada,"1,000-5,000"
+156.236.189.70,Graphic Design Systems 4,graphicdesignsys4.example,Technology & IT,India,"5,000-20,000"
+154.214.43.200,Wide World Importers 5,wideworldimporters5.example,Technology & IT,Netherlands,"20,000+"
+3.234.209.230,Proseware Retail 2,prosewareretail2.example,Retail & eCommerce,Australia,50-200
+212.98.212.10,School of Fine Art 8,schooloffineart8.example,Unknown,United States,"200-1,000"
+35.168.96.53,Graphic Design Systems 5,graphicdesignsys5.example,Technology & IT,United Kingdom,"1,000-5,000"
+85.153.153.14,Humongous Media 8,humongousmedia8.example,Unknown,Germany,"5,000-20,000"
+54.202.93.48,Fourth Coffee Group 8,fourthcoffeegroup8.example,Unknown,Canada,"20,000+"
+3.238.110.0/24,Contoso Shared Network 1,contoso-net1.example,Unknown,United States,Unknown
+3.235.41.0/24,Contoso Shared Network 2,contoso-net2.example,Unknown,United States,Unknown
+140.89.104.0/24,Contoso Shared Network 3,contoso-net3.example,Unknown,United States,Unknown

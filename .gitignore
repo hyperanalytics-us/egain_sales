@@ -3,7 +3,10 @@ __pycache__/
 .env
 # Runtime state: uploads, dataset databases, job files, chat sessions and
 # data/.session_secret, which signs the login cookie. Never commit any of it.
-data/
+# Written as data/* rather than data/ so the negation below can take effect -
+# git does not descend into an excluded directory.
+data/*
+!data/samples/
 .venv/
 venv/
 .DS_Store

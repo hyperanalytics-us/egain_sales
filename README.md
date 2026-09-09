@@ -46,6 +46,16 @@ so memory stays flat no matter how many visitors the log contains.
 
 ### IP → domain / client mapping (optional)
 
+A ready-made test file lives at **`data/samples/ip_to_client_sample.csv`** — 60 real
+IPs from the reference log spread across all four tiers, plus 3 `/24` blocks, mapped to
+fictional companies. Upload it from any prospect page to see named accounts populate.
+Regenerate it for a different dataset with:
+
+```bash
+./.venv/bin/python scripts/make_sample_ip_map.py [dataset_id] [output.csv]
+```
+
+
 Uploadable from Industry, Product, Campaign or IP Analysis. Any `.xlsx`/`.csv` with an IP
 column plus a Company and/or Domain column — headers are auto-detected, and `10.1.2.0/24`
 blocks are expanded against the IPs actually present in the log. Once loaded, every prospect
